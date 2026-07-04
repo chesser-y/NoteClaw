@@ -4,6 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from noteclaw_backend.api.router import api_router
 from noteclaw_backend.settings import Settings, get_settings
 
 
@@ -32,6 +33,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get(f"{settings.api_prefix}/health")
     async def api_health() -> dict[str, str]:
         return {"status": "ok"}
+
+    app.include_router(api_router, prefix=settings.api_prefix)
 
     return app
 

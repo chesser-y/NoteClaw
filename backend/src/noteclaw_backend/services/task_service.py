@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+from noteclaw_backend.domain.enums import TaskStatus, TaskType
+from noteclaw_backend.schemas.common import new_id, utc_now
+from noteclaw_backend.schemas.tasks import TaskRead
+
+
+class TaskService:
+    """Temporary in-memory task registry for API contract development."""
+
+    def __init__(self) -> None:
+        self._tasks: dict[str, TaskRead] = {}
+
+    def create_task(self, task_type: TaskType, message: str) -> TaskRead:
+        now = utc_now()
+        task = TaskRead(
+            id=new_id("task"),
+            type=task_type,
+            status=TaskStatus.QUEUED,
+            progress=0,
+            message=message,
+            created_at=now,
+            updated_at=now,
+        )
+        self._tasks[task.id] = task
+        return task
+
+    def get_task(self, task_id: str) -> TaskRead | None:
+        return self._tasks.get(task_id)
+
+    def list_tasks(
+        self,
+        status: TaskStatus | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[TaskRead], int]:
+        tasks = list(self._tasks.values())
+        if status is not None:
+            tasks = [task for task in tasks if task.status == status]
+        return tasks[offset : offset + limit], len(tasks)
+
+
+task_service = TaskService()
