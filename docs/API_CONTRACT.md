@@ -1,10 +1,14 @@
-# API Contract
+# API 接口契约
 
-All endpoints are prefixed with `/api`.
+本文档是前后端联调的主要依据。除健康检查外，所有业务接口都以 `/api` 为前缀。
 
-Response timestamps are ISO 8601 strings. IDs are strings.
+约定：
 
-## Common Types
+- 时间字段使用 ISO 8601 字符串。
+- ID 使用字符串，后端生成，通常带业务前缀，例如 `note_...`、`task_...`。
+- 当前后端实现是 contract-first stub，接口形状已经稳定，SQLite、FAISS、LLM、PPT、nanobot 的真实实现会在对应 service 层补齐。
+
+## 通用枚举
 
 ```ts
 type ContentType = "text" | "code" | "table" | "image" | "document" | "webpage" | "repository";
@@ -23,23 +27,31 @@ type GenerationType =
   | "video_script";
 ```
 
-## Health
+## 健康检查
 
 ### `GET /api/health`
 
-Returns:
+用途：确认后端 API 服务可用。
+
+返回：
 
 ```json
 { "status": "ok" }
 ```
 
-## Ingestion
+## 信息输入
 
 ### `POST /api/ingest`
 
-Use JSON for text/code/table/web snippets. Use `POST /api/ingest/files` for files.
+用途：录入文本、代码、表格、网页片段等 JSON 内容。
 
-Request:
+说明：
+
+- 文本、代码、表格优先走这个接口。
+- 图片、PDF、附件等文件走 `POST /api/ingest/files`。
+- 后端最终会完成摘要、标签、分类、切块、embedding、SQLite 入库、FAISS 入索引。
+
+请求：
 
 ```json
 {
@@ -54,7 +66,16 @@ Request:
 }
 ```
 
-Returns:
+字段说明：
+
+- `content_type`：内容类型，必须是通用枚举中的一种。
+- `content`：原始内容。
+- `title`：可选标题；为空时后端可自动生成。
+- `source`：来源，例如 `manual`、`upload`、`web`、`github`。
+- `source_url`：来源链接，可为空。
+- `metadata`：扩展元数据，前端可以传课程、项目、作者等信息。
+
+返回：
 
 ```json
 {
@@ -67,28 +88,40 @@ Returns:
 
 ### `POST /api/ingest/files`
 
-Multipart form:
+用途：上传图片、截图、PDF、文档、表格文件等。
 
-- `file`: required.
-- `content_type`: optional. If absent, backend infers type.
-- `source`: optional.
+请求类型：`multipart/form-data`
 
-Returns the same shape as `POST /api/ingest`.
+表单字段：
 
-## Knowledge
+- `file`：必填，上传文件。
+- `content_type`：可选，不传时后端根据文件类型推断。
+- `source`：可选，来源描述。
+
+返回：同 `POST /api/ingest`。
+
+图片处理约定：
+
+- 先 OCR，尽快让图片文字进入知识库。
+- 再异步调用多模态模型做视觉理解。
+- 视觉理解结果作为额外 chunk 追加到同一个 note 下。
+
+## 知识库
 
 ### `GET /api/knowledge`
 
-Query params:
+用途：获取知识条目列表，支持基础筛选和分页。
 
-- `q`: optional keyword.
-- `content_type`: optional.
-- `tag`: optional, repeatable.
-- `category`: optional.
-- `limit`: default `20`.
-- `offset`: default `0`.
+查询参数：
 
-Returns:
+- `q`：可选，关键词。
+- `content_type`：可选，内容类型。
+- `tag`：可选，可重复传多个标签。
+- `category`：可选，分类。
+- `limit`：分页大小，默认 `20`。
+- `offset`：分页偏移，默认 `0`。
+
+返回：
 
 ```json
 {
@@ -115,7 +148,9 @@ Returns:
 
 ### `GET /api/knowledge/{note_id}`
 
-Returns:
+用途：获取单个知识条目的完整内容和 chunks。
+
+返回：
 
 ```json
 {
@@ -145,7 +180,9 @@ Returns:
 
 ### `PATCH /api/knowledge/{note_id}`
 
-Editable fields:
+用途：更新知识条目的可编辑字段。
+
+请求：
 
 ```json
 {
@@ -158,25 +195,41 @@ Editable fields:
 
 ### `DELETE /api/knowledge/{note_id}`
 
-Deletes SQLite metadata and removes related vectors from FAISS mapping on next index compaction.
+用途：删除知识条目。
+
+实现约定：
+
+- SQLite 中删除或标记删除 note、chunk。
+- FAISS 不直接按向量删除，先在 SQLite 的 `vector_mappings` 中标记 deleted。
+- 后续做索引 compaction 时再重建 FAISS。
 
 ### `POST /api/knowledge/{note_id}/feedback`
 
-Request:
+用途：记录用户反馈，为个性化标签、摘要和检索排序预留数据。
+
+请求：
 
 ```json
 {
   "target": "summary",
   "rating": 1,
-  "comment": "The summary missed the code example."
+  "comment": "摘要漏掉了代码示例。"
 }
 ```
 
-## Search
+字段说明：
+
+- `target`：反馈目标，例如 `summary`、`tag`、`answer`、`retrieval`。
+- `rating`：`1` 表示正反馈，`0` 表示中性，`-1` 表示负反馈。
+- `comment`：可选文字说明。
+
+## 搜索
 
 ### `POST /api/search`
 
-Request:
+用途：对知识库做关键词、语义或混合检索。
+
+请求：
 
 ```json
 {
@@ -193,7 +246,13 @@ Request:
 }
 ```
 
-Returns:
+搜索模式：
+
+- `keyword`：SQLite 关键词检索，后续可升级到 FTS。
+- `semantic`：embedding API + FAISS。
+- `hybrid`：关键词和语义结果融合排序。
+
+返回：
 
 ```json
 {
@@ -214,11 +273,13 @@ Returns:
 }
 ```
 
-## Chat
+## 知识问答
 
 ### `POST /api/chat/sessions`
 
-Request:
+用途：创建一个问答会话。
+
+请求：
 
 ```json
 {
@@ -231,7 +292,7 @@ Request:
 }
 ```
 
-Returns:
+返回：
 
 ```json
 {
@@ -243,7 +304,9 @@ Returns:
 
 ### `POST /api/chat/sessions/{session_id}/messages`
 
-Request:
+用途：向指定会话发送问题，并获得基于知识库的回答。
+
+请求：
 
 ```json
 {
@@ -254,7 +317,14 @@ Request:
 }
 ```
 
-Returns:
+字段说明：
+
+- `message`：用户问题。
+- `retrieval_mode`：检索模式。
+- `use_nanobot_reasoning`：是否启用 nanobot 跨文档推理路径。
+- `top_k`：最多检索多少个 chunk。
+
+返回：
 
 ```json
 {
@@ -277,13 +347,18 @@ Returns:
 }
 ```
 
-## Generation
+实现约定：
+
+- 普通 RAG：`RetrievalService -> LLMProvider -> answer + citations`。
+- 跨文档推理：`RetrievalService broad context -> NanobotHarness -> answer + trace`。
+
+## 内容生成
 
 ### `POST /api/generate`
 
-Async generation for PPTX, generated images, diagrams, video scripts, reports.
+用途：创建异步生成任务。适用于 PPTX、图片、图示、视频脚本、报告等耗时任务。
 
-Request:
+请求：
 
 ```json
 {
@@ -303,7 +378,7 @@ Request:
 }
 ```
 
-Returns:
+返回：
 
 ```json
 {
@@ -315,9 +390,9 @@ Returns:
 
 ### `POST /api/generate/preview`
 
-Synchronous preview for Markdown, Mermaid mind map, PPT outline JSON.
+用途：同步生成轻量预览。适用于 Markdown、Mermaid 思维导图、PPT 大纲 JSON。
 
-Request:
+请求：
 
 ```json
 {
@@ -335,7 +410,7 @@ Request:
 }
 ```
 
-Returns:
+返回：
 
 ```json
 {
@@ -348,11 +423,26 @@ Returns:
 }
 ```
 
-## Tasks
+生成类型说明：
+
+- `learning_note`：学习笔记。
+- `technical_summary`：技术总结。
+- `report_draft`：报告草稿。
+- `ppt_outline`：PPT 大纲。
+- `pptx`：真实 `.pptx` 文件。
+- `mind_map`：Mermaid 思维导图。
+- `table`：结构化表格。
+- `image`：调用生图 API。
+- `diagram`：架构图或流程图。
+- `video_script`：视频脚本。
+
+## 任务
 
 ### `GET /api/tasks/{task_id}`
 
-Returns:
+用途：查询异步任务状态。
+
+返回：
 
 ```json
 {
@@ -370,18 +460,21 @@ Returns:
 
 ### `GET /api/tasks`
 
-Query params:
+用途：查询任务列表。
 
-- `status`: optional.
-- `limit`: default `20`.
+查询参数：
 
-## Harness
+- `status`：可选，任务状态。
+- `limit`：默认 `20`。
+- `offset`：默认 `0`。
+
+## Nanobot Harness
 
 ### `POST /api/harness/jobs`
 
-Reserved endpoint for nanobot-backed file operations, network search, repository collection, and cross-document reasoning.
+用途：预留 nanobot 执行入口，用于文件操作、网络检索、代码仓库搜集、跨文档推理等。
 
-Request:
+请求：
 
 ```json
 {
@@ -393,7 +486,7 @@ Request:
 }
 ```
 
-Returns:
+返回：
 
 ```json
 {
@@ -402,3 +495,9 @@ Returns:
   "message": "Harness job accepted"
 }
 ```
+
+实现约定：
+
+- 前端把 nanobot job 当普通异步任务处理。
+- 后端只通过 `NanobotHarness` service 调用 nanobot。
+- 具体 nanobot CLI/API 调用方式后续参考 nanobot 项目再实现，不泄漏到路由层。

@@ -1,6 +1,8 @@
-# Frontend API Client Contract
+# 前端 API Client 约定
 
-The frontend should centralize backend calls in one API layer, for example:
+前端建议把所有后端请求集中在一个 API 层，避免组件里直接写 `fetch`。
+
+建议目录：
 
 ```text
 frontend/src/api/
@@ -14,13 +16,13 @@ frontend/src/api/
   harness.ts
 ```
 
-Base URL:
+基础地址：
 
 ```ts
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api";
 ```
 
-## HTTP Wrapper
+## HTTP 封装
 
 ```ts
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -41,11 +43,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 ```
 
-For file upload, do not set `Content-Type`; let the browser set multipart boundary.
+文件上传不要手动设置 `Content-Type`，让浏览器自动设置 multipart boundary。
 
-## Suggested Frontend Session Store
+## 会话状态建议
 
-Use Pinia or composables to keep:
+可以用 Pinia 或 composable 维护问答状态：
 
 ```ts
 type ChatState = {
@@ -60,7 +62,7 @@ type ChatState = {
 };
 ```
 
-Chat send flow:
+发送问题的推荐流程：
 
 ```ts
 async function sendKnowledgeQuestion(message: string) {
@@ -88,7 +90,9 @@ async function sendKnowledgeQuestion(message: string) {
 }
 ```
 
-## API Functions
+## 推荐 API 方法
+
+### 信息输入
 
 ```ts
 export function ingestContent(payload: IngestRequest) {
@@ -97,7 +101,9 @@ export function ingestContent(payload: IngestRequest) {
     body: JSON.stringify(payload),
   });
 }
+```
 
+```ts
 export async function ingestFile(file: File, contentType?: string, source?: string) {
   const form = new FormData();
   form.append("file", file);
@@ -112,14 +118,22 @@ export async function ingestFile(file: File, contentType?: string, source?: stri
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<IngestResponse>;
 }
+```
 
+### 搜索
+
+```ts
 export function searchKnowledge(payload: SearchRequest) {
   return apiFetch<SearchResponse>("/search", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
+```
 
+### 问答
+
+```ts
 export function createChatSession(payload: ChatSessionCreate) {
   return apiFetch<ChatSessionRead>("/chat/sessions", {
     method: "POST",
@@ -133,7 +147,11 @@ export function sendChatMessage(sessionId: string, payload: ChatMessageRequest) 
     body: JSON.stringify(payload),
   });
 }
+```
 
+### 内容生成
+
+```ts
 export function previewGeneration(payload: GenerationRequest) {
   return apiFetch<GenerationPreviewResponse>("/generate/preview", {
     method: "POST",
@@ -147,11 +165,19 @@ export function createGenerationTask(payload: GenerationRequest) {
     body: JSON.stringify(payload),
   });
 }
+```
 
+### 任务
+
+```ts
 export function getTask(taskId: string) {
   return apiFetch<TaskRead>(`/tasks/${taskId}`);
 }
+```
 
+### Nanobot Harness
+
+```ts
 export function createHarnessJob(payload: HarnessJobRequest) {
   return apiFetch<HarnessJobResponse>("/harness/jobs", {
     method: "POST",
@@ -160,9 +186,19 @@ export function createHarnessJob(payload: HarnessJobRequest) {
 }
 ```
 
-## Polling Convention
+## 任务轮询约定
 
-For async ingestion, PPTX generation, image generation, vision enrichment, and nanobot jobs:
+异步任务包括：
+
+- 文档入库。
+- 图片 OCR 后的多模态理解。
+- PPTX 生成。
+- 生图。
+- 图示生成。
+- nanobot 网络检索。
+- nanobot 跨文档推理。
+
+推荐轮询：
 
 ```ts
 async function pollTask(taskId: string, onUpdate: (task: TaskRead) => void) {
@@ -175,12 +211,12 @@ async function pollTask(taskId: string, onUpdate: (task: TaskRead) => void) {
 }
 ```
 
-## Type Source
+## 类型来源
 
-The canonical schema source is backend OpenAPI:
+后端 OpenAPI 是类型的唯一事实来源：
 
 ```text
 http://127.0.0.1:8000/api/openapi.json
 ```
 
-The frontend can later generate TypeScript types from this file with `openapi-typescript`.
+后续可以使用 `openapi-typescript` 自动生成前端类型。

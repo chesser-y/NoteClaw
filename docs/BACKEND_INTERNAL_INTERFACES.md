@@ -1,20 +1,24 @@
-# Backend Internal Interfaces
+# 后端内部接口边界
 
-This document defines boundaries for backend parallel work.
+本文档用于后端并行开发，明确 SQLite、FAISS、模型 provider、业务 service 和 nanobot harness 的职责边界。
 
-## SQLite Responsibility
+## SQLite 职责
 
-SQLite stores all business metadata:
+SQLite 存所有业务元数据，不直接承担向量计算。
 
-- notes
-- chunks
-- chat sessions and messages
-- generation tasks
-- artifacts
-- feedback
-- source collection jobs
+需要存储：
 
-Suggested tables:
+- notes：知识条目。
+- chunks：切分后的文本块。
+- vector_mappings：chunk 和 FAISS row id 的映射。
+- chat_sessions：问答会话。
+- chat_messages：问答消息。
+- tasks：异步任务。
+- artifacts：生成产物，例如 pptx、图片、报告。
+- feedback：用户反馈。
+- source_jobs：自动信息搜集任务。
+
+建议基础表：
 
 ```sql
 notes(
@@ -63,11 +67,11 @@ tasks(
 );
 ```
 
-## FAISS Responsibility
+## FAISS 职责
 
-FAISS stores only normalized embedding vectors and integer row IDs.
+FAISS 只存向量索引和内部 row id，不存业务内容。
 
-Interface:
+接口：
 
 ```python
 class VectorStore:
@@ -78,16 +82,17 @@ class VectorStore:
     def load(self) -> None: ...
 ```
 
-FAISS index recommendation:
+实现建议：
 
-- Normalize embeddings.
-- Use `IndexFlatIP` for cosine-like similarity.
-- Store `chunk_id -> faiss_row_id` in SQLite.
-- Use lazy deletion in SQLite mapping and compact later.
+- embedding 向量先归一化。
+- 使用 `IndexFlatIP`，实现类 cosine similarity 的效果。
+- `chunk_id -> faiss_row_id` 存 SQLite。
+- 删除采用 lazy deletion：SQLite 标记 deleted，后续重建索引时清理。
+- FAISS 文件路径使用 `settings.faiss_index_path`。
 
-## Provider Responsibility
+## Provider 职责
 
-All model vendors must be hidden behind provider adapters.
+所有模型供应商都隐藏在 provider adapter 后面，业务 service 不直接依赖具体 API。
 
 ```python
 class LLMProvider:
@@ -104,20 +109,29 @@ class ImageProvider:
     async def generate_image(self, prompt: str, size: str = "1024x1024") -> str: ...
 ```
 
-## Ingestion Service
+模型配置来自 `.env`：
 
-Responsibilities:
+- `OPENAI_COMPAT_BASE_URL`
+- `OPENAI_COMPAT_API_KEY`
+- `LLM_MODEL`
+- `EMBEDDING_MODEL`
+- `VISION_MODEL`
+- `IMAGE_MODEL`
 
-- infer content type
-- OCR image first
-- chunk content
-- call summary/tag/category prompt
-- store note/chunks in SQLite
-- call embedding provider
-- add vectors to FAISS
-- enqueue async vision enrichment for images
+## IngestionService
 
-Contract:
+职责：
+
+- 推断内容类型。
+- 图片先 OCR。
+- 内容切块。
+- 调 LLM 生成摘要、标签、分类。
+- 原文、摘要、标签、来源写入 SQLite。
+- 调 embedding provider。
+- 向 FAISS 添加向量。
+- 图片多模态理解异步补充。
+
+接口：
 
 ```python
 class IngestionService:
@@ -125,16 +139,16 @@ class IngestionService:
     async def ingest_file(file: UploadFile, content_type: str | None) -> IngestResponse: ...
 ```
 
-## Retrieval Service
+## RetrievalService
 
-Responsibilities:
+职责：
 
-- keyword search via SQLite
-- semantic search via embedding + FAISS
-- hybrid rank merge
-- return chunks with note metadata
+- SQLite 关键词检索。
+- embedding + FAISS 语义检索。
+- hybrid 融合排序。
+- 返回 chunks 和 note metadata。
 
-Contract:
+接口：
 
 ```python
 class RetrievalService:
@@ -142,38 +156,38 @@ class RetrievalService:
     async def retrieve_for_question(query: str, top_k: int, scope: dict) -> list[Citation]: ...
 ```
 
-## Chat Service
+## ChatService
 
-Responsibilities:
+职责：
 
-- manage chat sessions
-- retrieve relevant context
-- call LLM for normal RAG
-- optionally delegate cross-document reasoning to nanobot harness
-- return answer with citations
+- 创建和管理问答会话。
+- 为问题检索相关 chunks。
+- 普通 RAG 路径调用 LLM。
+- 跨文档推理路径调用 nanobot harness。
+- 返回 answer、citations、trace。
 
-Normal QA path:
+普通问答路径：
 
 ```text
 question -> RetrievalService -> LLMProvider -> answer + citations
 ```
 
-Nanobot reasoning path:
+跨文档推理路径：
 
 ```text
-question -> RetrievalService broad context -> NanobotHarness -> synthesized answer + trace
+question -> RetrievalService broad context -> NanobotHarness -> answer + trace
 ```
 
-## Generation Service
+## GenerationService
 
-Responsibilities:
+职责：
 
-- collect scope context through retrieval
-- create structured Markdown / JSON / Mermaid / PPT outline
-- for PPTX: generate PPT JSON, generate selected images, render with python-pptx
-- store artifacts and task results
+- 根据 scope 检索知识库上下文。
+- 生成 Markdown、JSON、Mermaid、PPT outline。
+- PPTX 任务中先生成 PPT JSON，再生成部分配图，最后用 python-pptx 渲染真实 `.pptx`。
+- 保存 artifact 和 task result。
 
-PPT contract:
+PPT JSON 结构约定：
 
 ```json
 {
@@ -190,9 +204,20 @@ PPT contract:
 }
 ```
 
-## Nanobot Harness Service
+建议首批支持 layout：
 
-Reserved backend boundary:
+- `cover`
+- `section`
+- `text_image`
+- `comparison`
+- `quote`
+- `summary`
+
+## NanobotHarness
+
+nanobot 作为执行 harness，不直接暴露给前端。
+
+预留接口：
 
 ```python
 class NanobotHarness:
@@ -203,6 +228,17 @@ class NanobotHarness:
     async def file_operation(self, instruction: str, workspace: str, inputs: dict) -> dict: ...
 ```
 
-Initial implementation may return `501 Not Implemented` or queued task placeholders.
+用途：
 
-Final implementation should be developed after studying nanobot's native CLI/API usage and safety model.
+- 文件编辑和文件读取。
+- 网络检索。
+- 论文、新闻、代码仓库搜集。
+- 多文档综合推理。
+- 复杂任务的工具调用链。
+
+实现要求：
+
+- 路由层只调用 `NanobotHarness`。
+- `NanobotHarness` 内部再决定使用 CLI、Python API 或 OpenAI-compatible server。
+- 所有 harness 任务都应该落到 `tasks` 表，前端通过 task 轮询。
+- 文件操作必须限制 workspace，避免越权修改。
