@@ -1,0 +1,31 @@
+[
+  {
+    "question": "What are the challenges in estimating output impedance in inverter-based grids?",
+    "expected_answer_hint": "Estimating output impedance in inverter-based grids is challenging due to dynamic grid conditions, which require real-time estimation. Traditional methods like signal injection and historical data analysis have limitations, such as sensitivity to noise and complexity.",
+    "recommended_files": [
+      "text/arxiv_2410.14077v2_qa.md"
+    ]
+  },
+  {
+    "question": "蜂巢取快递验证码摁错怎么办",
+    "expected_answer_hint": "Use the T2Retrieval Chinese note about pickup code / verification code recovery.",
+    "recommended_files": [
+      "text/t2_1.md"
+    ]
+  },
+  {
+    "question": "How does the axios createInstance helper build a new Axios instance?",
+    "expected_answer_hint": "Look up javascript axios createInstance snippet.",
+    "recommended_files": [
+      "code/javascript_createInstance.js"
+    ]
+  },
+  {
+    "question": "What information can be read from the financial table image?",
+    "expected_answer_hint": "Use OCR/vision on images/financial_table_image.png and its sidecar metadata.",
+    "recommended_files": [
+      "images/financial_table_image.png",
+      "images/financial_table_image.md"
+    ]
+  }
+]

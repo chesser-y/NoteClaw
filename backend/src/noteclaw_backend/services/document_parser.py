@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass, field
+from functools import lru_cache
 from io import BytesIO, StringIO
+import os
 from pathlib import Path
+import shutil
+import sys
 
-from PIL import Image
+from PIL import Image, ImageOps
 import pytesseract
 
 from noteclaw_backend.domain.enums import ContentType
@@ -110,10 +114,74 @@ def delimited_text_to_markdown(text: str, delimiter: str | None = None) -> str:
 
 def _ocr_image(data: bytes) -> str:
     try:
-        image = Image.open(BytesIO(data))
-        return pytesseract.image_to_string(image)
+        _configure_tesseract()
+        image = _prepare_ocr_image(Image.open(BytesIO(data)))
+        text = _run_tesseract(image, config="--psm 6")
+        if not text.strip():
+            text = _run_tesseract(image, config="--psm 11")
+        return text
     except Exception:
         return ""
+
+
+@lru_cache(maxsize=1)
+def _configure_tesseract() -> None:
+    candidates = [
+        os.environ.get("TESSERACT_CMD"),
+        str(Path(sys.prefix) / "bin" / "tesseract"),
+        shutil.which("tesseract"),
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            pytesseract.pytesseract.tesseract_cmd = candidate
+            return
+
+
+def _prepare_ocr_image(image: Image.Image) -> Image.Image:
+    image = ImageOps.exif_transpose(image)
+    if image.mode not in {"RGB", "L"}:
+        image = image.convert("RGB")
+
+    max_side = max(image.size)
+    if max_side > 1800:
+        scale = 1800 / max_side
+        size = (max(1, int(image.width * scale)), max(1, int(image.height * scale)))
+        image = image.resize(size, Image.Resampling.LANCZOS)
+    elif max_side < 1000:
+        image = image.resize((image.width * 2, image.height * 2), Image.Resampling.LANCZOS)
+
+    gray = ImageOps.grayscale(image)
+    return ImageOps.autocontrast(gray)
+
+
+def _run_tesseract(image: Image.Image, *, config: str) -> str:
+    languages = _ocr_languages()
+    errors: list[Exception] = []
+    for language in languages:
+        try:
+            return pytesseract.image_to_string(image, lang=language, config=config)
+        except Exception as exc:
+            errors.append(exc)
+    if errors:
+        raise errors[-1]
+    return ""
+
+
+@lru_cache(maxsize=1)
+def _ocr_languages() -> tuple[str | None, ...]:
+    try:
+        available = set(pytesseract.get_languages(config=""))
+    except Exception:
+        return (None,)
+
+    preferred: list[str | None] = []
+    if {"chi_sim", "eng"}.issubset(available):
+        preferred.append("chi_sim+eng")
+    if "eng" in available:
+        preferred.append("eng")
+    if "chi_sim" in available:
+        preferred.append("chi_sim")
+    return tuple(preferred) or (None,)
 
 
 def _extract_pptx_text(data: bytes) -> str:

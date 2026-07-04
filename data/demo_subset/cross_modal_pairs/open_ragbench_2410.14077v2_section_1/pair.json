@@ -1,0 +1,24 @@
+{
+  "purpose": "Cross-modal positive pair: text query points to a document section that contains both text and linked images.",
+  "dataset": "open_ragbench/pdf/arxiv",
+  "query_id": "852703f0-8373-43a2-a18a-eb5908ad0779",
+  "query": "What are the challenges in estimating output impedance in inverter-based grids?",
+  "answer": "Estimating output impedance in inverter-based grids is challenging due to dynamic grid conditions, which require real-time estimation. Traditional methods like signal injection and historical data analysis have limitations, such as sensitivity to noise and complexity.",
+  "doc_id": "2410.14077v2",
+  "section_id": 1,
+  "source_json": "NoteClaw/data/open_ragbench/pdf/arxiv/corpus/2410.14077v2.json",
+  "document": "document.md",
+  "query_file": "query.txt",
+  "images": [
+    {
+      "original_name": "img-0.jpeg",
+      "path": "figure_1.jpg",
+      "bytes": 26827
+    }
+  ],
+  "demo_steps": [
+    "Upload document.md and the figure images as knowledge items.",
+    "Search or ask the query in query.txt.",
+    "The expected hit is this document section and its linked image evidence."
+  ]
+}
