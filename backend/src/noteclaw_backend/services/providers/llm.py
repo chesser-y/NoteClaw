@@ -8,7 +8,13 @@ from openai import AsyncOpenAI
 
 
 class LLMProvider(Protocol):
-    async def complete_text(self, messages: list[dict]) -> str:
+    async def complete_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         ...
 
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
@@ -20,11 +26,22 @@ class OpenAICompatibleLLMProvider:
         self.model = model
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
-    async def complete_text(self, messages: list[dict]) -> str:
+    async def complete_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.2 if temperature is None else temperature,
+        }
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
         response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.2,
+            **kwargs,
         )
         return response.choices[0].message.content or ""
 
@@ -49,7 +66,14 @@ class OpenAICompatibleLLMProvider:
 
 
 class FallbackLLMProvider:
-    async def complete_text(self, messages: list[dict]) -> str:
+    async def complete_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        _ = temperature, max_tokens
         user_text = "\n".join(str(msg.get("content", "")) for msg in messages if msg.get("role") == "user")
         context = _extract_between(user_text, "Context:", "Question:") or user_text
         question = _extract_after(user_text, "Question:") or "the question"
@@ -79,13 +103,27 @@ class ResilientLLMProvider:
         self.primary = primary
         self.fallback = fallback
 
-    async def complete_text(self, messages: list[dict]) -> str:
+    async def complete_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         if self.primary is not None:
             try:
-                return await self.primary.complete_text(messages)
+                return await self.primary.complete_text(
+                    messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
             except Exception:
                 pass
-        return await self.fallback.complete_text(messages)
+        return await self.fallback.complete_text(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
 
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
         if self.primary is not None:

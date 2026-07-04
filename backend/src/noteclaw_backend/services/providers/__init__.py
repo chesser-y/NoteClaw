@@ -38,8 +38,19 @@ class _OpenAICompatLLMProvider:
     def __init__(self, client: NoteClawOpenAICompat) -> None:
         self.client = client
 
-    async def complete_text(self, messages: list[dict]) -> str:
-        return await self.client.complete_text(messages)  # type: ignore[arg-type]
+    async def complete_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        kwargs: dict[str, Any] = {}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        return await self.client.complete_text(messages, **kwargs)  # type: ignore[arg-type]
 
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
         return await self.client.complete_json(messages, schema=schema)  # type: ignore[arg-type]

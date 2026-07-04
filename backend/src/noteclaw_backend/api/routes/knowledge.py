@@ -11,6 +11,8 @@ from noteclaw_backend.schemas.knowledge import (
     NoteDetail,
     NoteUpdateRequest,
 )
+from noteclaw_backend.schemas.knowledge_graph import KnowledgeGraphResponse
+from noteclaw_backend.services.knowledge_graph import knowledge_graph_service
 from noteclaw_backend.storage.faiss_store import get_vector_store
 from noteclaw_backend.storage.repositories import get_repository
 
@@ -36,6 +38,29 @@ async def list_knowledge(
         category=category,
     )
     return KnowledgeListResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/graph", response_model=KnowledgeGraphResponse)
+async def get_knowledge_graph(
+    include_notes: bool = True,
+    include_categories: bool = True,
+    include_content_types: bool = True,
+    min_tag_count: int = Query(default=1, ge=1, le=50),
+    min_edge_weight: int = Query(default=1, ge=1, le=50),
+    limit_tags: int = Query(default=80, ge=1, le=300),
+    limit_notes: int = Query(default=300, ge=1, le=1000),
+    focus_tag: str | None = None,
+) -> KnowledgeGraphResponse:
+    return await knowledge_graph_service.build_graph(
+        include_notes=include_notes,
+        include_categories=include_categories,
+        include_content_types=include_content_types,
+        min_tag_count=min_tag_count,
+        min_edge_weight=min_edge_weight,
+        limit_tags=limit_tags,
+        limit_notes=limit_notes,
+        focus_tag=focus_tag,
+    )
 
 
 @router.get("/{note_id}", response_model=NoteDetail)
