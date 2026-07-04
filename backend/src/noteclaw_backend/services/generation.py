@@ -21,6 +21,14 @@ class GenerationService:
         task = task_service.create_task(
             TaskType.GENERATION,
             f"{request.generation_type.value} generation started.",
+            work_item_title=request.prompt[:120],
+            tags=["generation", request.generation_type.value],
+            current_stage="Preparing retrieved context",
+            requires_confirmation=True,
+            metadata={
+                "generation_type": request.generation_type.value,
+                "scope": request.scope.model_dump(mode="json"),
+            },
         )
         task_service.mark_running(task.id, "Generating content")
         try:
