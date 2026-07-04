@@ -1,92 +1,193 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { RefreshCw } from 'lucide-vue-next'
-import { getTask } from '../api/tasks'
+import { Filter, SlidersHorizontal } from 'lucide-vue-next'
 import { useTaskStore } from '../stores/tasks'
-import type { TaskRead } from '../api/types'
-import TaskCard from '../components/tasks/TaskCard.vue'
+import type { TaskRead, TaskStatus } from '../api/types'
 import TaskDetailDrawer from '../components/tasks/TaskDetailDrawer.vue'
 
-const route = useRoute()
-const taskStore = useTaskStore()
+const store = useTaskStore()
 const selected = ref<TaskRead | null>(null)
-const loadingDetail = ref(false)
 
-const inProgress = computed(() => taskStore.tasks.filter((t) => t.status === 'running' || t.status === 'queued'))
-const done = computed(() => taskStore.tasks.filter((t) => t.status === 'succeeded' || t.status === 'failed' || t.status === 'cancelled'))
-
-async function openTask(task: TaskRead) {
-  selected.value = task
-  loadingDetail.value = true
-  try {
-    const fresh = await getTask(task.id)
-    if (selected.value?.id === task.id) selected.value = fresh
-  } catch (e) {
-    console.error(e)
-  } finally {
-    loadingDetail.value = false
-  }
+const stubReviewTask: TaskRead = {
+  id: 'task_review_sample_001',
+  type: 'generation',
+  status: 'running',
+  progress: 0.85,
+  message: 'Waiting for review',
+  result: { note: '生成项目展示 PPT 大纲，已草拟 12 张幻灯片，等待用户确认是否插入图表。' },
+  error: null,
+  created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+  updated_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
 }
 
-async function refresh() {
-  await taskStore.refresh()
-  const queryTask = route.query.task as string | undefined
-  if (queryTask) {
-    const match = taskStore.tasks.find((t) => t.id === queryTask)
-    if (match) await openTask(match)
+onMounted(() => store.refresh())
+
+const buckets = computed(() => {
+  const queued: TaskRead[] = []
+  const inProgress: TaskRead[] = []
+  const done: TaskRead[] = []
+  for (const t of store.tasks) {
+    if (t.status === 'queued') queued.push(t)
+    else if (t.status === 'running') inProgress.push(t)
+    else if (t.status === 'succeeded' || t.status === 'failed') done.push(t)
   }
+  return {
+    queued,
+    inProgress,
+    review: [stubReviewTask],
+    done,
+  }
+})
+
+const statusRingClass = (status: TaskStatus) => {
+  if (status === 'succeeded') return 'blue'
+  if (status === 'failed') return 'gray'
+  return ''
 }
 
-onMounted(refresh)
+const shortId = (id: string) => id.slice(0, 12)
+
+const titleFromTask = (t: TaskRead) => {
+  if (t.message && t.message.length > 4) return t.message
+  return t.type
+}
+
+const progressLabel = (t: TaskRead) => `${Math.round(t.progress * 100)}%`
+
+function openTask(t: TaskRead) {
+  selected.value = t
+}
 </script>
 
 <template>
-  <section class="content-wrap">
-    <header class="mb-5 flex items-end justify-between">
-      <div>
-        <h1 class="section-title">Tasks</h1>
-        <p class="muted mt-1 text-sm">复杂任务的进度与结果 · nanobot 跨文档推理会出现在这里</p>
-      </div>
-      <button class="btn h-8" type="button" @click="refresh">
-        <RefreshCw :size="13" />
-        刷新
-      </button>
+  <section class="tasks-view">
+    <header class="topbar tight">
+      <span>Tasks</span>
+      <span class="dot-menu">...</span>
+      <span class="spacer"></span>
+      <span class="tool-icons">
+        <Filter :size="16" />
+        <SlidersHorizontal :size="16" />
+      </span>
     </header>
 
-    <p v-if="taskStore.error" class="mb-5 rounded-lg border border-[#5a2520] bg-[#2a1614] px-3 py-2 text-xs text-[#f0b8ad]">
-      {{ taskStore.error }}
-    </p>
-
-    <div v-if="inProgress.length" class="mb-7">
-      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#929399]">In progress</h2>
-      <div class="space-y-3">
-        <TaskCard
-          v-for="t in inProgress"
+    <div class="kanban">
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring gray"></span>
+          Queued
+          <span class="count">{{ buckets.queued.length }}</span>
+          <span class="plus">+</span>
+        </div>
+        <div
+          v-for="t in buckets.queued"
           :key="t.id"
-          :task="t"
+          class="task-card"
           @click="openTask(t)"
-        />
+        >
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring gray"></span>
+            {{ titleFromTask(t) }}
+          </div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--muted);"></span>{{ progressLabel(t) }}</span>
+          </div>
+        </div>
+        <div v-if="!buckets.queued.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
+      </div>
+
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring"></span>
+          In progress
+          <span class="count">{{ buckets.inProgress.length }}</span>
+          <span class="plus">+</span>
+        </div>
+        <div
+          v-for="t in buckets.inProgress"
+          :key="t.id"
+          class="task-card"
+          @click="openTask(t)"
+        >
+          <span class="pill right-chip">Working... <span class="small-dot" style="color: var(--orange);"></span></span>
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring"></span>
+            {{ titleFromTask(t) }}
+          </div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--orange);"></span>{{ progressLabel(t) }}</span>
+          </div>
+        </div>
+        <div v-if="!buckets.inProgress.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
+      </div>
+
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring" style="border-color: var(--orange);"></span>
+          Need review
+          <span class="count">{{ buckets.review.length }}</span>
+          <span class="plus">+</span>
+        </div>
+        <div
+          v-for="t in buckets.review"
+          :key="t.id"
+          class="task-card"
+          @click="openTask(t)"
+        >
+          <span class="pill right-chip">Waiting <span class="small-dot" style="color: var(--orange);"></span></span>
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring"></span>
+            {{ titleFromTask(t) }}
+          </div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--blue);"></span>Review</span>
+          </div>
+        </div>
+        <div v-if="!buckets.review.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
+      </div>
+
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring green"></span>
+          Done
+          <span class="count">{{ buckets.done.length }}</span>
+          <span class="plus">+</span>
+        </div>
+        <div
+          v-for="t in buckets.done"
+          :key="t.id"
+          class="task-card"
+          @click="openTask(t)"
+        >
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring" :class="statusRingClass(t.status)">✓</span>
+            {{ titleFromTask(t) }}
+          </div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--green);"></span>{{ t.status }}</span>
+          </div>
+        </div>
+        <div v-if="!buckets.done.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
       </div>
     </div>
 
-    <div v-if="done.length">
-      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#929399]">Recent</h2>
-      <div class="space-y-3">
-        <TaskCard
-          v-for="t in done"
-          :key="t.id"
-          :task="t"
-          @click="openTask(t)"
-        />
-      </div>
-    </div>
-
-    <div v-if="!taskStore.tasks.length && !taskStore.loading" class="surface flex flex-col items-center gap-2 px-4 py-12 text-center">
-      <div class="text-sm text-[#f0f1f2]">暂无任务</div>
-      <p class="text-xs text-[#73747a]">在创作台生成 PPT、拖入 PDF，或用 ⌘K 触发 nanobot 任务。</p>
-    </div>
-
-    <TaskDetailDrawer :task="selected" :loading="loadingDetail" @close="selected = null" />
+    <TaskDetailDrawer v-if="selected" :task="selected" :loading="false" @close="selected = null" />
   </section>
 </template>
+
+<style scoped>
+.tasks-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+</style>

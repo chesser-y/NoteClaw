@@ -1,192 +1,216 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Search, SlidersHorizontal, MessageSquareText, RefreshCw } from 'lucide-vue-next'
+import { Plus, Filter, SlidersHorizontal } from 'lucide-vue-next'
 import { listKnowledge } from '../api/knowledge'
-import { searchKnowledge } from '../api/search'
-import type { ContentType, NoteListItem, SearchResult } from '../api/types'
+import type { ContentType, NoteListItem } from '../api/types'
 import { useUiStore } from '../stores/ui'
-import NoteCard from '../components/library/NoteCard.vue'
 
 const ui = useUiStore()
 
-type Filter = 'recent' | 'all' | 'document' | 'image' | 'code' | 'starred'
-const filters: { id: Filter; label: string }[] = [
-  { id: 'recent', label: '最近使用' },
-  { id: 'all', label: '全部' },
-  { id: 'document', label: '文档' },
-  { id: 'image', label: '图片' },
-  { id: 'code', label: '代码' },
-  { id: 'starred', label: '收藏' },
+const items = ref<NoteListItem[]>([])
+const total = ref(0)
+const loading = ref(false)
+const q = ref('')
+const contentType = ref<ContentType | ''>('')
+const selected = ref<NoteListItem | null>(null)
+
+const tabs: { label: string; value: ContentType | '' }[] = [
+  { label: 'All', value: '' },
+  { label: 'Text', value: 'text' },
+  { label: 'Code', value: 'code' },
+  { label: 'Image', value: 'image' },
+  { label: 'Table', value: 'table' },
+  { label: 'Document', value: 'document' },
 ]
 
-const activeFilter = ref<Filter>('all')
-const query = ref('')
-const loading = ref(false)
-const error = ref('')
-const notes = ref<NoteListItem[]>([])
-const searchResults = ref<SearchResult[] | null>(null)
-const showAdvanced = ref(false)
-
-const contentTypeForFilter = computed<ContentType | ''>(() => {
-  if (activeFilter.value === 'document') return 'document'
-  if (activeFilter.value === 'image') return 'image'
-  if (activeFilter.value === 'code') return 'code'
-  return ''
-})
-
-async function loadNotes() {
+async function load() {
   loading.value = true
-  error.value = ''
   try {
-    searchResults.value = null
-    const response = await listKnowledge({
-      q: query.value || undefined,
-      content_type: contentTypeForFilter.value,
-      limit: 24,
+    const res = await listKnowledge({
+      q: q.value || undefined,
+      content_type: contentType.value,
+      limit: 50,
     })
-    notes.value = response.items
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
+    items.value = res.items
+    total.value = res.total
   } finally {
     loading.value = false
   }
 }
 
-async function runSearch() {
-  if (!query.value.trim()) {
-    await loadNotes()
-    return
-  }
-  loading.value = true
-  error.value = ''
-  try {
-    const response = await searchKnowledge({
-      query: query.value,
-      mode: 'hybrid',
-      filters: {
-        content_types: contentTypeForFilter.value ? [contentTypeForFilter.value] : [],
-        tags: [],
-        category: null,
-        date_from: null,
-        date_to: null,
-      },
-      limit: 12,
-    })
-    searchResults.value = response.results
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    loading.value = false
+onMounted(load)
+
+function onSearch() {
+  load()
+}
+
+function setTab(t: ContentType | '') {
+  contentType.value = t
+  load()
+}
+
+const relativeTime = (iso: string) => {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+const statusClass = (status: string) => {
+  if (status === 'ready') return 'green'
+  if (status === 'pending' || status === 'processing') return ''
+  if (status === 'failed') return 'gray'
+  return 'gray'
+}
+
+const typeColor = (t: ContentType) => {
+  switch (t) {
+    case 'image': return '#4aaeff'
+    case 'code': return 'var(--green)'
+    case 'table': return 'var(--orange)'
+    case 'document': return 'var(--pink)'
+    default: return 'var(--blue)'
   }
 }
 
-function onAsk() {
-  ui.openAsk(null, query.value.trim() || undefined)
+const typeLabel = (t: ContentType) => {
+  if (t === 'image') return 'Image'
+  if (t === 'code') return 'Code'
+  if (t === 'table') return 'Table'
+  if (t === 'document') return 'PDF'
+  if (t === 'webpage') return 'Web'
+  return 'Note'
 }
 
-onMounted(loadNotes)
+const filteredItems = computed(() => items.value)
 </script>
 
 <template>
-  <section class="content-wrap">
-    <header class="mb-5 flex items-end justify-between">
-      <div>
-        <h1 class="section-title">Library</h1>
-        <p class="muted mt-1 text-sm">管理沉淀下来的资料 · 搜索会调用 hybrid 检索</p>
-      </div>
-      <button class="btn h-8" type="button" @click="loadNotes">
-        <RefreshCw :size="13" />
-        刷新
-      </button>
+  <section class="library-view">
+    <header class="topbar tight">
+      <span>Library</span>
+      <span class="dot-menu">...</span>
+      <span class="spacer"></span>
+      <span class="tool-icons">
+        <Filter :size="16" />
+        <SlidersHorizontal :size="16" />
+        <Plus :size="16" @click="ui.openPalette()" style="cursor: pointer;" />
+      </span>
     </header>
 
-    <div class="surface mb-5 flex items-center gap-2 px-3 py-2">
-      <Search :size="15" class="text-[#73747a]" />
+    <header class="topbar tight" style="gap: 12px;">
       <input
-        v-model="query"
-        class="min-w-0 flex-1 bg-transparent text-sm text-[#f0f1f2] outline-none placeholder:text-[#73747a]"
+        v-model="q"
+        class="field"
+        style="height: 32px; max-width: 320px; font-size: 13px;"
         placeholder="Search anything in your notes..."
-        @keydown.enter="runSearch"
+        @keydown.enter="onSearch"
       />
-      <button class="btn btn-ghost h-7 px-2 text-xs" type="button" @click="showAdvanced = !showAdvanced">
-        <SlidersHorizontal :size="12" />
-        高级
-      </button>
-      <button class="btn btn-ghost h-7 px-2 text-xs" type="button" @click="onAsk">
-        <MessageSquareText :size="12" />
-        提问
-      </button>
-    </div>
+      <div style="display: flex; gap: 2px;">
+        <button
+          v-for="t in tabs"
+          :key="t.value"
+          class="tab"
+          :class="{ active: contentType === t.value }"
+          @click="setTab(t.value)"
+        >
+          {{ t.label }}
+        </button>
+      </div>
+      <span class="spacer"></span>
+      <span class="muted" style="font-size: 12px;">{{ total }} items</span>
+    </header>
 
-    <div v-if="showAdvanced" class="surface mb-5 grid gap-3 p-4 md:grid-cols-3">
-      <div>
-        <label class="mb-1 block text-xs text-[#929399]">标签</label>
-        <input class="field h-9" placeholder="#tag1, #tag2" />
+    <div class="issues-table" style="padding: 18px 28px; flex: 1; overflow-y: auto;">
+      <div v-if="loading" class="placeholder">Loading...</div>
+      <div v-else-if="!filteredItems.length" class="placeholder">
+        No notes yet. Paste content or drop a file in Inbox to get started.
       </div>
-      <div>
-        <label class="mb-1 block text-xs text-[#929399]">分类</label>
-        <input class="field h-9" placeholder="research / engineering / ..." />
-      </div>
-      <div>
-        <label class="mb-1 block text-xs text-[#929399]">日期范围</label>
-        <div class="flex items-center gap-2">
-          <input type="date" class="field h-9" />
-          <span class="text-xs text-[#73747a]">—</span>
-          <input type="date" class="field h-9" />
+      <div v-else>
+        <div
+          v-for="item in filteredItems"
+          :key="item.id"
+          class="issue-row"
+          @click="selected = item"
+        >
+          <span class="status-ring" :class="statusClass(item.status)"></span>
+          <span class="pill square" :style="{ color: typeColor(item.content_type) }">
+            {{ typeLabel(item.content_type) }}
+          </span>
+          <span class="priority"><span></span><span></span><span></span></span>
+          <strong>{{ item.title }}</strong>
+          <span class="right-tags">
+            <span
+              v-for="tag in (item.tags || []).slice(0, 3)"
+              :key="tag"
+              class="pill square"
+            >
+              #{{ tag }}
+            </span>
+            <span v-if="(item.tags || []).length > 3" class="pill square">
+              +{{ (item.tags || []).length - 3 }}
+            </span>
+          </span>
+          <span class="muted" style="font-size: 12px;">{{ item.source || 'manual' }}</span>
+          <span class="date">{{ relativeTime(item.created_at) }}</span>
         </div>
       </div>
     </div>
 
-    <div class="mb-6 flex flex-wrap items-center gap-1.5">
-      <button
-        v-for="f in filters"
-        :key="f.id"
-        type="button"
-        class="rounded-full px-3 py-1.5 text-xs font-medium transition"
-        :class="activeFilter === f.id ? 'bg-[#626be6] text-white' : 'bg-[#1b1c1e] text-[#929399] hover:bg-[#242527]'"
-        @click="activeFilter = f.id; loadNotes()"
-      >
-        {{ f.label }}
-      </button>
-    </div>
-
-    <p v-if="error" class="mb-5 rounded-lg border border-[#5a2520] bg-[#2a1614] px-3 py-2 text-xs text-[#f0b8ad]">
-      {{ error }}
-    </p>
-
-    <div v-if="searchResults" class="space-y-4">
-      <div class="text-xs text-[#929399]">检索结果 · {{ searchResults.length }} 条</div>
-      <div class="grid gap-3 md:grid-cols-2">
-        <NoteCard
-          v-for="r in searchResults"
-          :key="`${r.note_id}-${r.chunk_id}`"
-          :title="r.title"
-          :content-type="r.content_type"
-          :summary="r.snippet"
-          :tags="r.tags"
-          :source="r.source ?? undefined"
-          :score="r.score ?? undefined"
-        />
+    <div v-if="selected" class="drawer-backdrop" @click="selected = null">
+      <div class="drawer-panel" @click.stop>
+        <header class="topbar">
+          <span>{{ selected.title }}</span>
+          <span class="spacer"></span>
+          <button class="icon-button" @click="selected = null">✕</button>
+        </header>
+        <div style="padding: 20px 24px; overflow-y: auto; flex: 1;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+            <span class="pill square" :style="{ color: typeColor(selected.content_type) }">
+              {{ typeLabel(selected.content_type) }}
+            </span>
+            <span
+              v-for="tag in (selected.tags || [])"
+              :key="tag"
+              class="pill square"
+            >#{{ tag }}</span>
+          </div>
+          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px;">Summary</h3>
+          <p style="margin: 0 0 24px; color: var(--muted); font-size: 14px; line-height: 1.5;">
+            {{ selected.summary || '—' }}
+          </p>
+          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px;">Metadata</h3>
+          <div class="side-meta">
+            <div class="side-row">
+              <span class="label">Source</span>
+              <span>{{ selected.source || 'manual' }}</span>
+            </div>
+            <div class="side-row">
+              <span class="label">Category</span>
+              <span>{{ selected.category || '—' }}</span>
+            </div>
+            <div class="side-row">
+              <span class="label">Status</span>
+              <span>{{ selected.status }}</span>
+            </div>
+            <div class="side-row">
+              <span class="label">Created</span>
+              <span>{{ new Date(selected.created_at).toLocaleString() }}</span>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-
-    <div v-else-if="notes.length" class="grid gap-3 md:grid-cols-2">
-      <NoteCard
-        v-for="note in notes"
-        :key="note.id"
-        :title="note.title"
-        :content-type="note.content_type"
-        :summary="note.summary ?? ''"
-        :tags="note.tags"
-        :source="note.source ?? undefined"
-        :created-at="note.created_at"
-      />
-    </div>
-
-    <div v-else-if="!loading" class="surface flex flex-col items-center gap-2 px-4 py-12 text-center">
-      <div class="text-sm text-[#f0f1f2]">还没有保存的资料</div>
-      <p class="text-xs text-[#73747a]">回到首页粘贴文本或拖入 PDF 即可开始沉淀知识库。</p>
-      <RouterLink to="/" class="btn btn-primary mt-2 h-8">返回首页</RouterLink>
     </div>
   </section>
 </template>
+
+<style scoped>
+.library-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+</style>

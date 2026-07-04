@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { FileText, Image as ImageIcon, Code2, Table, Plus, Paperclip } from 'lucide-vue-next'
+import { Plus, Paperclip, Send, FileText, Image as ImageIcon, Code2, Table } from 'lucide-vue-next'
 import type { PreviewState } from '../../composables/useIngest'
 import { useIngest } from '../../composables/useIngest'
 
-const emit = defineEmits<{ preview: [state: PreviewState] }>()
+const emit = defineEmits<{
+  preview: [state: PreviewState]
+  ask: [question: string]
+}>()
 
 const ingest = useIngest()
 const input = ref('')
@@ -26,8 +29,22 @@ function onPaste(e: ClipboardEvent) {
   }
 }
 
-function onSubmit() {
+function onSave() {
   detectAndPreview(input.value)
+}
+
+function onAsk() {
+  const text = input.value.trim()
+  if (!text) return
+  emit('ask', text)
+  input.value = ''
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault()
+    onAsk()
+  }
 }
 
 function onFileChange(e: Event) {
@@ -51,27 +68,34 @@ function onDrop(e: DragEvent) {
 
 <template>
   <div
-    class="surface flex flex-col gap-3 p-5 transition-shadow"
-    :class="dragOver ? 'border-[#626be6] shadow-[0_0_0_3px_rgba(98,107,230,0.22)]' : ''"
+    class="home-hero-input"
+    :class="{ 'is-drag': dragOver }"
     @dragover.prevent="dragOver = true"
     @dragleave="dragOver = false"
     @drop.prevent="onDrop"
   >
     <textarea
       v-model="input"
-      class="field textarea min-h-[140px] resize-none border-0 p-0 text-[15px] shadow-none focus:shadow-none"
-      placeholder="Ask, paste, drop…  粘贴文本、代码、表格，或拖入 PDF / 图片"
+      class="hero-textarea"
+      placeholder="Ask, paste, drop…  直接提问，或粘贴文本/代码/表格，拖入 PDF/图片"
       @paste="onPaste"
+      @keydown="onKeydown"
     ></textarea>
 
-    <div class="flex flex-wrap items-center gap-2">
-      <button class="btn btn-ghost h-8 px-2 text-xs" type="button" @click="fileInput?.click()">
+    <div class="hero-toolbar">
+      <button class="btn btn-ghost hero-tool-btn" type="button" @click="fileInput?.click()">
         <Plus :size="13" />
         Add source
       </button>
-      <input ref="fileInput" type="file" class="hidden" accept="image/*,.pdf,.md,.txt,.csv,.json,.html,.py,.ts,.js,.go" @change="onFileChange" />
+      <input
+        ref="fileInput"
+        type="file"
+        class="hidden"
+        accept="image/*,.pdf,.md,.txt,.csv,.json,.html,.py,.ts,.js,.go"
+        @change="onFileChange"
+      />
 
-      <div class="mx-1 h-4 w-px bg-[#24262a]"></div>
+      <div class="hero-divider"></div>
 
       <span class="chip chip-muted"><FileText :size="11" /> Text</span>
       <span class="chip chip-muted"><Code2 :size="11" /> Code</span>
@@ -79,10 +103,87 @@ function onDrop(e: DragEvent) {
       <span class="chip chip-muted"><ImageIcon :size="11" /> Image</span>
       <span class="chip chip-muted"><Paperclip :size="11" /> PDF</span>
 
-      <button class="btn btn-primary ml-auto h-8" type="button" :disabled="!input.trim()" @click="onSubmit">
-        <Plus :size="14" />
-        理解 / 保存
-      </button>
+      <div style="margin-left: auto; display: flex; gap: 8px;">
+        <button
+          class="btn"
+          type="button"
+          :disabled="!input.trim()"
+          @click="onSave"
+          title="保存为资料"
+        >
+          保存
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="!input.trim()"
+          @click="onAsk"
+          title="提问 (⌘/Ctrl + Enter)"
+        >
+          <Send :size="13" />
+          提问
+        </button>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.home-hero-input {
+  width: min(720px, 100%);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.home-hero-input.is-drag {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(98, 107, 230, 0.22);
+}
+
+.hero-textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.hero-textarea::placeholder {
+  color: #6e6f75;
+}
+
+.hero-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hero-tool-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.hero-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--line);
+  margin: 0 4px;
+}
+
+.hero-toolbar :deep(.chip) {
+  cursor: default;
+}
+</style>
