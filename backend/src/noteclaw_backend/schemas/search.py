@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -11,6 +11,8 @@ class SearchFilters(BaseModel):
     content_types: list[ContentType] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     category: str | None = None
+    source: str | None = None
+    source_contains: str | None = None
     date_from: date | None = None
     date_to: date | None = None
 
@@ -30,7 +32,11 @@ class SearchResult(BaseModel):
     score: float | None = None
     content_type: ContentType
     tags: list[str] = Field(default_factory=list)
+    summary: str | None = None
     source: str | None = None
+    source_url: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class SearchResponse(BaseModel):

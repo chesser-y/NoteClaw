@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, Query
 
 from noteclaw_backend.domain.enums import ContentType
@@ -26,6 +28,10 @@ async def list_knowledge(
     content_type: ContentType | None = None,
     tag: list[str] = Query(default_factory=list),
     category: str | None = None,
+    source: str | None = None,
+    source_contains: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> KnowledgeListResponse:
@@ -36,6 +42,10 @@ async def list_knowledge(
         content_type=content_type,
         tags=tag,
         category=category,
+        source=source,
+        source_contains=source_contains,
+        date_from=date_from,
+        date_to=date_to,
     )
     return KnowledgeListResponse(items=items, total=total, limit=limit, offset=offset)
 
