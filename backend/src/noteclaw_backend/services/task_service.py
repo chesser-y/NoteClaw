@@ -25,6 +25,66 @@ class TaskService:
         self._tasks[task.id] = task
         return task
 
+
+    def update_task(
+        self,
+        task_id: str,
+        *,
+        status: TaskStatus | None = None,
+        progress: float | None = None,
+        message: str | None = None,
+        result: dict | None = None,
+        error: str | None = None,
+    ) -> TaskRead | None:
+        task = self._tasks.get(task_id)
+        if task is None:
+            return None
+
+        updated = task.model_copy(
+            update={
+                "status": status or task.status,
+                "progress": task.progress if progress is None else progress,
+                "message": task.message if message is None else message,
+                "result": task.result if result is None else result,
+                "error": task.error if error is None else error,
+                "updated_at": utc_now(),
+            }
+        )
+        self._tasks[task_id] = updated
+        return updated
+
+    def mark_running(self, task_id: str, message: str | None = None) -> TaskRead | None:
+        return self.update_task(
+            task_id,
+            status=TaskStatus.RUNNING,
+            progress=0.1,
+            message=message or "Running",
+        )
+
+    def mark_succeeded(
+        self,
+        task_id: str,
+        *,
+        message: str | None = None,
+        result: dict | None = None,
+    ) -> TaskRead | None:
+        return self.update_task(
+            task_id,
+            status=TaskStatus.SUCCEEDED,
+            progress=1,
+            message=message or "Succeeded",
+            result=result,
+        )
+
+    def mark_failed(self, task_id: str, error: str) -> TaskRead | None:
+        return self.update_task(
+            task_id,
+            status=TaskStatus.FAILED,
+            progress=1,
+            message="Failed",
+            error=error,
+        )
+
     def get_task(self, task_id: str) -> TaskRead | None:
         return self._tasks.get(task_id)
 
