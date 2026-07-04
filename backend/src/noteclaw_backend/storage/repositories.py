@@ -147,19 +147,39 @@ class SQLiteKnowledgeRepository:
         content_type: ContentType | None = None,
         tags: list[str] | None = None,
         category: str | None = None,
+        source: str | None = None,
+        source_contains: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> tuple[list[NoteListItem], int]:
         clauses = []
         params: list[Any] = []
         if q:
             like = f"%{q}%"
-            clauses.append("(title like ? or content like ? or coalesce(summary, '') like ?)")
-            params.extend([like, like, like])
+            clauses.append(
+                "(title like ? or content like ? or coalesce(summary, '') like ? or "
+                "coalesce(tags_json, '') like ? or coalesce(source, '') like ? or coalesce(source_url, '') like ?)"
+            )
+            params.extend([like, like, like, like, like, like])
         if content_type:
             clauses.append("content_type = ?")
             params.append(content_type.value)
         if category:
             clauses.append("category = ?")
             params.append(category)
+        if source:
+            clauses.append("(source = ? or source_url = ?)")
+            params.extend([source, source])
+        if source_contains:
+            like = f"%{source_contains}%"
+            clauses.append("(coalesce(source, '') like ? or coalesce(source_url, '') like ?)")
+            params.extend([like, like])
+        if date_from:
+            clauses.append("date(created_at) >= ?")
+            params.append(date_from.isoformat())
+        if date_to:
+            clauses.append("date(created_at) <= ?")
+            params.append(date_to.isoformat())
         where = " where " + " and ".join(clauses) if clauses else ""
         with self.store.connect() as conn:
             rows = conn.execute(
@@ -221,7 +241,8 @@ class SQLiteKnowledgeRepository:
         with self.store.connect() as conn:
             rows = conn.execute(
                 """
-                select c.*, n.title, n.content_type, n.tags_json, n.source, n.category
+                select c.*, n.title, n.content_type, n.summary, n.tags_json, n.category,
+                       n.source, n.source_url, n.created_at as note_created_at, n.updated_at as note_updated_at
                 from chunks c join notes n on n.id = c.note_id
                 where c.note_id = ?
                 order by c.chunk_index
@@ -237,7 +258,8 @@ class SQLiteKnowledgeRepository:
         with self.store.connect() as conn:
             rows = conn.execute(
                 f"""
-                select c.*, n.title, n.content_type, n.tags_json, n.source, n.category
+                select c.*, n.title, n.content_type, n.summary, n.tags_json, n.category,
+                       n.source, n.source_url, n.created_at as note_created_at, n.updated_at as note_updated_at
                 from chunks c join notes n on n.id = c.note_id
                 where c.id in ({placeholders})
                 """,
@@ -250,8 +272,8 @@ class SQLiteKnowledgeRepository:
         with self.store.connect() as conn:
             rows = conn.execute(
                 """
-                select c.*, n.title, n.content_type, n.tags_json, n.source, n.category,
-                       n.created_at, n.updated_at
+                select c.*, n.title, n.content_type, n.summary, n.tags_json, n.category,
+                       n.source, n.source_url, n.created_at as note_created_at, n.updated_at as note_updated_at
                 from chunks c join notes n on n.id = c.note_id
                 where n.status = ?
                 """,
@@ -263,7 +285,17 @@ class SQLiteKnowledgeRepository:
         for row in rows:
             if not self._row_matches_filters(row, filters):
                 continue
-            haystack = f"{row['title']}\n{row['text']}".lower()
+            tags_text = " ".join(_load(row["tags_json"], []))
+            haystack = "\n".join(
+                [
+                    row["title"],
+                    row["text"],
+                    row["summary"] or "",
+                    tags_text,
+                    row["source"] or "",
+                    row["source_url"] or "",
+                ]
+            ).lower()
             phrase_hits = haystack.count(query_lower) if query_lower else 0
             term_hits = sum(haystack.count(term) for term in terms)
             if phrase_hits == 0 and term_hits == 0:
@@ -358,6 +390,8 @@ class SQLiteKnowledgeRepository:
         )
 
     def _chunk_search_row(self, row: Row) -> dict:
+        created_at = self._row_value(row, "note_created_at") or self._row_value(row, "created_at")
+        updated_at = self._row_value(row, "note_updated_at") or self._row_value(row, "updated_at")
         return {
             "chunk_id": row["id"],
             "note_id": row["note_id"],
@@ -365,12 +399,22 @@ class SQLiteKnowledgeRepository:
             "text": row["text"],
             "title": row["title"],
             "content_type": ContentType(row["content_type"]),
+            "summary": self._row_value(row, "summary"),
             "tags": _load(row["tags_json"], []),
             "source": row["source"],
+            "source_url": self._row_value(row, "source_url"),
             "category": row["category"],
+            "created_at": _dt(created_at) if created_at else None,
+            "updated_at": _dt(updated_at) if updated_at else None,
             "score": None,
             "snippet": row["text"][:220],
         }
+
+    def _row_value(self, row: Row, key: str) -> Any:
+        try:
+            return row[key]
+        except (IndexError, KeyError):
+            return None
 
     def _row_matches_filters(self, row: Row, filters: Any) -> bool:
         content_types = getattr(filters, "content_types", []) or []
@@ -385,7 +429,17 @@ class SQLiteKnowledgeRepository:
             return False
         if category and row["category"] != category:
             return False
-        created = _dt(row["created_at"]).date()
+        source = getattr(filters, "source", None)
+        source_contains = getattr(filters, "source_contains", None)
+        if source and row["source"] != source and self._row_value(row, "source_url") != source:
+            return False
+        if source_contains:
+            needle = source_contains.lower()
+            haystack = f"{row['source'] or ''}\n{self._row_value(row, 'source_url') or ''}".lower()
+            if needle not in haystack:
+                return False
+        created_raw = self._row_value(row, "note_created_at") or self._row_value(row, "created_at")
+        created = _dt(created_raw).date()
         if date_from and created < date_from:
             return False
         if date_to and created > date_to:

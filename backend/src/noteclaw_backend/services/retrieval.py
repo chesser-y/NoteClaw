@@ -110,6 +110,18 @@ class RetrievalService:
             return False
         if filters.category and row.get("category") != filters.category:
             return False
+        if filters.source and row.get("source") != filters.source and row.get("source_url") != filters.source:
+            return False
+        if filters.source_contains:
+            needle = filters.source_contains.lower()
+            haystack = f"{row.get('source') or ''}\n{row.get('source_url') or ''}".lower()
+            if needle not in haystack:
+                return False
+        created_at = row.get("created_at")
+        if filters.date_from and (created_at is None or created_at.date() < filters.date_from):
+            return False
+        if filters.date_to and (created_at is None or created_at.date() > filters.date_to):
+            return False
         return True
 
     def _matches_scope(self, row: dict, scope: dict | None) -> bool:
@@ -135,7 +147,11 @@ class RetrievalService:
             score=row.get("score"),
             content_type=row["content_type"],
             tags=row.get("tags", []),
+            summary=row.get("summary"),
             source=row.get("source"),
+            source_url=row.get("source_url"),
+            created_at=row.get("created_at"),
+            updated_at=row.get("updated_at"),
         )
 
     def _to_citation(self, row: dict) -> Citation:
