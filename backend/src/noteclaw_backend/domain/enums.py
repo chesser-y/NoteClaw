@@ -41,6 +41,27 @@ class TaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class WorkItemStatus(StrEnum):
+    QUEUED = "queued"
+    IN_PROGRESS = "in_progress"
+    NEED_REVIEW = "need_review"
+    DONE = "done"
+
+
+class TimelineKind(StrEnum):
+    RESEARCH = "research"
+    SOURCE = "source"
+    OUTPUT = "output"
+
+
+class TimelineItemStatus(StrEnum):
+    PLANNED = "planned"
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    MILESTONE = "milestone"
+    DONE = "done"
+
+
 class GenerationType(StrEnum):
     LEARNING_NOTE = "learning_note"
     TECHNICAL_SUMMARY = "technical_summary"
