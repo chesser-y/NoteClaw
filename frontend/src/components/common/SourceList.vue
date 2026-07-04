@@ -17,6 +17,6 @@ defineProps<{
       :title="source.title"
       :score="source.score ?? null"
     />
-    <p v-if="!sources.length" class="text-xs text-[#9ca3af]">尚未引用任何资料。</p>
+    <p v-if="!sources.length" class="text-xs text-[#73747a]">尚未引用任何资料。</p>
   </div>
 </template>

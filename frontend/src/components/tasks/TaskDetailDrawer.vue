@@ -41,13 +41,13 @@ const citations = computed(() => {
 
 <template>
   <Drawer :open="!!task" title="Task detail" width="460px" @close="$emit('close')">
-    <div v-if="!task" class="py-10 text-center text-sm text-[#9ca3af]">未选中任务</div>
+    <div v-if="!task" class="py-10 text-center text-sm text-[#73747a]">未选中任务</div>
     <div v-else class="space-y-5">
       <section>
-        <div class="mb-1 text-xs text-[#9ca3af]">目标</div>
-        <div class="text-[15px] font-semibold text-[#111827]">{{ task.type }}</div>
-        <p class="mt-1 text-xs text-[#6b7280]">{{ task.message || '正在执行任务…' }}</p>
-        <div class="mt-2 flex items-center gap-2 text-[11px] text-[#9ca3af]">
+        <div class="mb-1 text-xs text-[#73747a]">目标</div>
+        <div class="text-[15px] font-semibold text-[#f0f1f2]">{{ task.type }}</div>
+        <p class="mt-1 text-xs text-[#929399]">{{ task.message || '正在执行任务…' }}</p>
+        <div class="mt-2 flex items-center gap-2 text-[11px] text-[#73747a]">
           <span>{{ task.id }}</span>
           <span>·</span>
           <span>{{ task.status }}</span>
@@ -55,30 +55,30 @@ const citations = computed(() => {
       </section>
 
       <section>
-        <div class="mb-2 text-xs text-[#9ca3af]">进度</div>
+        <div class="mb-2 text-xs text-[#73747a]">进度</div>
         <ul class="space-y-1.5">
           <li v-for="(step, idx) in steps" :key="idx" class="flex items-center gap-2 text-sm">
-            <Check v-if="step.done" :size="14" class="text-[#10b981]" />
-            <Loader2 v-else-if="task.status === 'running' && idx === steps.findIndex(s => !s.done)" :size="14" class="animate-spin text-[#4f46e5]" />
-            <Circle v-else :size="14" class="text-[#d1d5db]" />
-            <span :class="step.done ? 'text-[#111827]' : 'text-[#6b7280]'">{{ step.label }}</span>
+            <Check v-if="step.done" :size="14" class="text-[#00c853]" />
+            <Loader2 v-else-if="task.status === 'running' && idx === steps.findIndex(s => !s.done)" :size="14" class="animate-spin text-[#626be6]" />
+            <Circle v-else :size="14" class="text-[#4a4b50]" />
+            <span :class="step.done ? 'text-[#f0f1f2]' : 'text-[#929399]'">{{ step.label }}</span>
           </li>
         </ul>
-        <div v-if="task.status === 'failed'" class="mt-3 flex items-center gap-2 rounded-lg border border-[#fcd9d4] bg-[#fef3f1] px-3 py-2 text-xs text-[#b42618]">
+        <div v-if="task.status === 'failed'" class="mt-3 flex items-center gap-2 rounded-lg border border-[#5a2520] bg-[#2a1614] px-3 py-2 text-xs text-[#f0b8ad]">
           <AlertCircle :size="13" />
           {{ task.error || '任务执行失败' }}
         </div>
       </section>
 
       <section>
-        <div class="mb-2 text-xs text-[#9ca3af]">使用的资料</div>
+        <div class="mb-2 text-xs text-[#73747a]">使用的资料</div>
         <SourceList v-if="citations.length" :sources="citations" />
-        <p v-else class="text-xs text-[#9ca3af]">该任务尚未关联资料，或后端 stub 还未返回引用。</p>
+        <p v-else class="text-xs text-[#73747a]">该任务尚未关联资料，或后端 stub 还未返回引用。</p>
       </section>
 
       <section v-if="task.result && Object.keys(task.result).length">
-        <div class="mb-2 text-xs text-[#9ca3af]">Result</div>
-        <pre class="max-h-[200px] overflow-auto rounded-lg border border-[#e5e7eb] bg-[#fafbfc] p-3 text-[11px] text-[#111827]">{{ JSON.stringify(task.result, null, 2) }}</pre>
+        <div class="mb-2 text-xs text-[#73747a]">Result</div>
+        <pre class="max-h-[200px] overflow-auto rounded-lg border border-[#24262a] bg-[#151618] p-3 text-[11px] text-[#f0f1f2]">{{ JSON.stringify(task.result, null, 2) }}</pre>
       </section>
     </div>
   </Drawer>

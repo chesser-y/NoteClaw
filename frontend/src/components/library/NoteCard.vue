@@ -57,12 +57,12 @@ const meta = computed(() => {
 <template>
   <article class="card card-hover group relative flex flex-col gap-3 py-4">
     <header class="flex items-start gap-3">
-      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f46e5]">
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(98, 107, 230, 0.16)] text-[#626be6]">
         <component :is="iconFor" :size="16" />
       </div>
       <div class="min-w-0 flex-1">
-        <h3 class="truncate text-[15px] font-semibold text-[#111827]">{{ title }}</h3>
-        <div class="mt-0.5 truncate text-xs text-[#9ca3af]">{{ meta }}</div>
+        <h3 class="truncate text-[15px] font-semibold text-[#f0f1f2]">{{ title }}</h3>
+        <div class="mt-0.5 truncate text-xs text-[#73747a]">{{ meta }}</div>
       </div>
       <button
         class="opacity-0 transition group-hover:opacity-100"
@@ -70,11 +70,11 @@ const meta = computed(() => {
         aria-label="Star"
         @click.stop
       >
-        <Star :size="14" class="text-[#9ca3af] hover:text-[#f59e0b]" />
+        <Star :size="14" class="text-[#73747a] hover:text-[#ff9f35]" />
       </button>
     </header>
 
-    <p class="line-clamp-2 text-sm leading-6 text-[#374151]">
+    <p class="line-clamp-2 text-sm leading-6 text-[#c8c9cd]">
       {{ summary || '等待摘要生成…' }}
     </p>
 

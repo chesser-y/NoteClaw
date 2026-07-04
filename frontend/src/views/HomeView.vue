@@ -76,8 +76,8 @@ const iconFor = (t: string) => {
 
         <div>
           <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-[#111827]">最近内容</h2>
-            <RouterLink to="/library" class="flex items-center gap-1 text-xs text-[#6b7280] hover:text-[#4f46e5]">
+            <h2 class="text-sm font-semibold text-[#f0f1f2]">最近内容</h2>
+            <RouterLink to="/library" class="flex items-center gap-1 text-xs text-[#929399] hover:text-[#626be6]">
               查看全部 <ArrowUpRight :size="12" />
             </RouterLink>
           </div>
@@ -88,14 +88,14 @@ const iconFor = (t: string) => {
               :to="`/library?id=${item.id}`"
               class="card card-hover flex items-start gap-3 py-4"
             >
-              <component :is="iconFor(item.content_type)" :size="16" class="mt-0.5 text-[#6b7280]" />
+              <component :is="iconFor(item.content_type)" :size="16" class="mt-0.5 text-[#929399]" />
               <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium text-[#111827]">{{ item.title }}</div>
-                <div class="mt-0.5 truncate text-xs text-[#9ca3af]">{{ item.summary || '—' }}</div>
+                <div class="truncate text-sm font-medium text-[#f0f1f2]">{{ item.title }}</div>
+                <div class="mt-0.5 truncate text-xs text-[#73747a]">{{ item.summary || '—' }}</div>
               </div>
             </RouterLink>
           </div>
-          <p v-else-if="!loadingRecent" class="rounded-xl border border-dashed border-[#e5e7eb] bg-white px-4 py-6 text-center text-xs text-[#9ca3af]">
+          <p v-else-if="!loadingRecent" class="rounded-xl border border-dashed border-[#24262a] bg-[#101112] px-4 py-6 text-center text-xs text-[#73747a]">
             还没有保存的资料。粘贴文本或拖入文件即可开始。
           </p>
         </div>
@@ -104,34 +104,34 @@ const iconFor = (t: string) => {
       <aside class="space-y-5">
         <div class="surface p-4">
           <div class="mb-3 flex items-center justify-between">
-            <div class="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Today</div>
-            <div class="text-xs text-[#9ca3af]">{{ todayLabel }}</div>
+            <div class="text-xs font-semibold uppercase tracking-wide text-[#929399]">Today</div>
+            <div class="text-xs text-[#73747a]">{{ todayLabel }}</div>
           </div>
-          <p class="text-sm text-[#111827]">把今天看到的内容粘到上方，让 NoteClaw 帮你整理。</p>
+          <p class="text-sm text-[#f0f1f2]">把今天看到的内容粘到上方，让 NoteClaw 帮你整理。</p>
         </div>
 
         <div class="surface p-4">
-          <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">最近任务</div>
+          <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#929399]">最近任务</div>
           <div v-if="tasks.length" class="space-y-2">
             <RouterLink
               v-for="t in tasks"
               :key="t.id"
               :to="`/tasks?task=${t.id}`"
-              class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[#f3f4f6]"
+              class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[#1b1c1e]"
             >
               <span
                 class="status-dot"
                 :class="{ 'status-dot--warn': t.status === 'running', 'status-dot--idle': t.status === 'queued' }"
               ></span>
-              <span class="truncate text-[#111827]">{{ t.type }}</span>
-              <span class="ml-auto text-[11px] text-[#9ca3af]">{{ Math.round(t.progress * 100) }}%</span>
+              <span class="truncate text-[#f0f1f2]">{{ t.type }}</span>
+              <span class="ml-auto text-[11px] text-[#73747a]">{{ Math.round(t.progress * 100) }}%</span>
             </RouterLink>
           </div>
-          <p v-else class="text-xs text-[#9ca3af]">暂无任务。</p>
+          <p v-else class="text-xs text-[#73747a]">暂无任务。</p>
         </div>
 
         <div class="surface p-4">
-          <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">推荐继续</div>
+          <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#929399]">推荐继续</div>
           <div class="space-y-1.5">
             <AskTrigger label="总结最近保存的内容" />
             <AskTrigger label="找出相关笔记" />

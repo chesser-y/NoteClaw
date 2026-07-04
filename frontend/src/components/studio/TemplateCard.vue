@@ -11,17 +11,17 @@ defineProps<{
   <button
     type="button"
     class="card card-hover flex items-start gap-3 text-left transition"
-    :class="active ? 'border-[#4f46e5] shadow-[0_0_0_3px_rgba(79,70,229,0.15)]' : ''"
+    :class="active ? 'border-[#626be6] shadow-[0_0_0_3px_rgba(98,107,230,0.22)]' : ''"
   >
     <div
       class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-      :class="active ? 'bg-[#4f46e5] text-white' : 'bg-[#eef2ff] text-[#4f46e5]'"
+      :class="active ? 'bg-[#626be6] text-white' : 'bg-[rgba(98, 107, 230, 0.16)] text-[#626be6]'"
     >
       <component :is="icon" :size="18" />
     </div>
     <div class="min-w-0 flex-1">
-      <div class="text-[15px] font-semibold text-[#111827]">{{ label }}</div>
-      <div class="mt-0.5 text-xs text-[#6b7280]">{{ sub }}</div>
+      <div class="text-[15px] font-semibold text-[#f0f1f2]">{{ label }}</div>
+      <div class="mt-0.5 text-xs text-[#929399]">{{ sub }}</div>
     </div>
   </button>
 </template>

@@ -60,18 +60,18 @@ async function submit() {
 <template>
   <Drawer :open="ui.askOpen" title="Ask NoteClaw" width="480px" @close="ui.closeAsk()">
     <div class="space-y-4">
-      <p class="text-sm text-[#6b7280]">
-        你可以问<span class="font-medium text-[#4f46e5]">{{ scopeLabel }}</span>，也可以问全部资料。
+      <p class="text-sm text-[#929399]">
+        你可以问<span class="font-medium text-[#626be6]">{{ scopeLabel }}</span>，也可以问全部资料。
       </p>
 
       <form
-        class="flex items-center gap-2 rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus-within:border-[#4f46e5] focus-within:shadow-[0_0_0_3px_rgba(79,70,229,0.15)]"
+        class="flex items-center gap-2 rounded-xl border border-[#24262a] bg-[#151618] px-3 py-2 focus-within:border-[#626be6] focus-within:shadow-[0_0_0_3px_rgba(98,107,230,0.22)]"
         @submit.prevent="submit"
       >
-        <MessageSquareText :size="16" class="text-[#9ca3af]" />
+        <MessageSquareText :size="16" class="text-[#73747a]" />
         <input
           v-model="input"
-          class="min-w-0 flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
+          class="min-w-0 flex-1 bg-transparent text-sm text-[#f0f1f2] outline-none placeholder:text-[#73747a]"
           placeholder="输入问题..."
           type="text"
         />
@@ -81,21 +81,21 @@ async function submit() {
         </button>
       </form>
 
-      <p v-if="error" class="rounded-lg border border-[#fcd9d4] bg-[#fef3f1] px-3 py-2 text-xs text-[#b42618]">
+      <p v-if="error" class="rounded-lg border border-[#5a2520] bg-[#2a1614] px-3 py-2 text-xs text-[#f0b8ad]">
         {{ error }}
       </p>
 
       <div v-if="last" class="space-y-3">
-        <div class="rounded-xl border border-[#e5e7eb] bg-[#fafbfc] p-4 text-sm leading-6 text-[#111827]">
+        <div class="rounded-xl border border-[#24262a] bg-[#151618] p-4 text-sm leading-6 text-[#f0f1f2]">
           {{ last.answer }}
         </div>
 
         <div>
-          <div class="mb-2 text-xs font-medium uppercase tracking-wide text-[#6b7280]">Sources used</div>
+          <div class="mb-2 text-xs font-medium uppercase tracking-wide text-[#929399]">Sources used</div>
           <SourceList :sources="last.citations" />
         </div>
 
-        <div class="text-[11px] text-[#9ca3af]">
+        <div class="text-[11px] text-[#73747a]">
           检索模式：{{ last.trace.retrieval_mode }} · nanobot：{{ last.trace.used_nanobot ? '是' : '否' }}
         </div>
       </div>

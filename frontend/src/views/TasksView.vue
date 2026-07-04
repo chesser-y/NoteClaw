@@ -54,12 +54,12 @@ onMounted(refresh)
       </button>
     </header>
 
-    <p v-if="taskStore.error" class="mb-5 rounded-lg border border-[#fcd9d4] bg-[#fef3f1] px-3 py-2 text-xs text-[#b42618]">
+    <p v-if="taskStore.error" class="mb-5 rounded-lg border border-[#5a2520] bg-[#2a1614] px-3 py-2 text-xs text-[#f0b8ad]">
       {{ taskStore.error }}
     </p>
 
     <div v-if="inProgress.length" class="mb-7">
-      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">In progress</h2>
+      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#929399]">In progress</h2>
       <div class="space-y-3">
         <TaskCard
           v-for="t in inProgress"
@@ -71,7 +71,7 @@ onMounted(refresh)
     </div>
 
     <div v-if="done.length">
-      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Recent</h2>
+      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#929399]">Recent</h2>
       <div class="space-y-3">
         <TaskCard
           v-for="t in done"
@@ -83,8 +83,8 @@ onMounted(refresh)
     </div>
 
     <div v-if="!taskStore.tasks.length && !taskStore.loading" class="surface flex flex-col items-center gap-2 px-4 py-12 text-center">
-      <div class="text-sm text-[#111827]">暂无任务</div>
-      <p class="text-xs text-[#9ca3af]">在创作台生成 PPT、拖入 PDF，或用 ⌘K 触发 nanobot 任务。</p>
+      <div class="text-sm text-[#f0f1f2]">暂无任务</div>
+      <p class="text-xs text-[#73747a]">在创作台生成 PPT、拖入 PDF，或用 ⌘K 触发 nanobot 任务。</p>
     </div>
 
     <TaskDetailDrawer :task="selected" :loading="loadingDetail" @close="selected = null" />

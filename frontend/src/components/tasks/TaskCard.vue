@@ -68,8 +68,8 @@ const currentStep = computed(() => {
   >
     <header class="flex items-start justify-between gap-3">
       <div class="min-w-0 flex-1">
-        <h3 class="truncate text-[15px] font-semibold text-[#111827]">{{ task.type }}</h3>
-        <div class="mt-0.5 flex items-center gap-2 text-xs text-[#6b7280]">
+        <h3 class="truncate text-[15px] font-semibold text-[#f0f1f2]">{{ task.type }}</h3>
+        <div class="mt-0.5 flex items-center gap-2 text-xs text-[#929399]">
           <span
             class="status-dot"
             :class="{
@@ -78,16 +78,16 @@ const currentStep = computed(() => {
             }"
             v-if="statusLabel.kind !== 'error'"
           ></span>
-          <AlertCircle v-else :size="11" class="text-[#ef4444]" />
+          <AlertCircle v-else :size="11" class="text-[#f0b8ad]" />
           <span>{{ statusLabel.text }}</span>
           <span v-if="subLabel">· {{ subLabel }}</span>
         </div>
       </div>
-      <div v-if="task.status === 'running'" class="text-xs text-[#9ca3af]">
+      <div v-if="task.status === 'running'" class="text-xs text-[#73747a]">
         {{ Math.round(task.progress * 100) }}%
       </div>
-      <Loader2 v-if="task.status === 'running'" :size="14" class="animate-spin text-[#4f46e5]" />
-      <Check v-else-if="task.status === 'succeeded'" :size="14" class="text-[#10b981]" />
+      <Loader2 v-if="task.status === 'running'" :size="14" class="animate-spin text-[#626be6]" />
+      <Check v-else-if="task.status === 'succeeded'" :size="14" class="text-[#00c853]" />
     </header>
 
     <div v-if="task.status === 'running' || task.status === 'queued'" class="mt-3 flex flex-wrap items-center gap-1 text-[11px]">
@@ -96,18 +96,18 @@ const currentStep = computed(() => {
           class="rounded-full px-2 py-0.5"
           :class="
             idx <= currentStep
-              ? 'bg-[#eef2ff] text-[#4f46e5]'
-              : 'bg-[#f3f4f6] text-[#9ca3af]'
+              ? 'bg-[rgba(98, 107, 230, 0.16)] text-[#626be6]'
+              : 'bg-[#1b1c1e] text-[#73747a]'
           "
         >
           {{ step }}
         </span>
-        <ArrowRight v-if="idx < steps.length - 1" :size="10" class="text-[#d1d5db]" />
+        <ArrowRight v-if="idx < steps.length - 1" :size="10" class="text-[#4a4b50]" />
       </template>
     </div>
 
-    <div v-else-if="task.status === 'succeeded'" class="mt-3 h-1 w-full overflow-hidden rounded-full bg-[#f3f4f6]">
-      <div class="h-full w-full bg-[#10b981]"></div>
+    <div v-else-if="task.status === 'succeeded'" class="mt-3 h-1 w-full overflow-hidden rounded-full bg-[#1b1c1e]">
+      <div class="h-full w-full bg-[#00c853]"></div>
     </div>
   </article>
 </template>

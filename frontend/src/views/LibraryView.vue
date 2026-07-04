@@ -101,10 +101,10 @@ onMounted(loadNotes)
     </header>
 
     <div class="surface mb-5 flex items-center gap-2 px-3 py-2">
-      <Search :size="15" class="text-[#9ca3af]" />
+      <Search :size="15" class="text-[#73747a]" />
       <input
         v-model="query"
-        class="min-w-0 flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
+        class="min-w-0 flex-1 bg-transparent text-sm text-[#f0f1f2] outline-none placeholder:text-[#73747a]"
         placeholder="Search anything in your notes..."
         @keydown.enter="runSearch"
       />
@@ -120,18 +120,18 @@ onMounted(loadNotes)
 
     <div v-if="showAdvanced" class="surface mb-5 grid gap-3 p-4 md:grid-cols-3">
       <div>
-        <label class="mb-1 block text-xs text-[#6b7280]">标签</label>
+        <label class="mb-1 block text-xs text-[#929399]">标签</label>
         <input class="field h-9" placeholder="#tag1, #tag2" />
       </div>
       <div>
-        <label class="mb-1 block text-xs text-[#6b7280]">分类</label>
+        <label class="mb-1 block text-xs text-[#929399]">分类</label>
         <input class="field h-9" placeholder="research / engineering / ..." />
       </div>
       <div>
-        <label class="mb-1 block text-xs text-[#6b7280]">日期范围</label>
+        <label class="mb-1 block text-xs text-[#929399]">日期范围</label>
         <div class="flex items-center gap-2">
           <input type="date" class="field h-9" />
-          <span class="text-xs text-[#9ca3af]">—</span>
+          <span class="text-xs text-[#73747a]">—</span>
           <input type="date" class="field h-9" />
         </div>
       </div>
@@ -143,19 +143,19 @@ onMounted(loadNotes)
         :key="f.id"
         type="button"
         class="rounded-full px-3 py-1.5 text-xs font-medium transition"
-        :class="activeFilter === f.id ? 'bg-[#4f46e5] text-white' : 'bg-white text-[#6b7280] hover:bg-[#f3f4f6]'"
+        :class="activeFilter === f.id ? 'bg-[#626be6] text-white' : 'bg-[#1b1c1e] text-[#929399] hover:bg-[#242527]'"
         @click="activeFilter = f.id; loadNotes()"
       >
         {{ f.label }}
       </button>
     </div>
 
-    <p v-if="error" class="mb-5 rounded-lg border border-[#fcd9d4] bg-[#fef3f1] px-3 py-2 text-xs text-[#b42618]">
+    <p v-if="error" class="mb-5 rounded-lg border border-[#5a2520] bg-[#2a1614] px-3 py-2 text-xs text-[#f0b8ad]">
       {{ error }}
     </p>
 
     <div v-if="searchResults" class="space-y-4">
-      <div class="text-xs text-[#6b7280]">检索结果 · {{ searchResults.length }} 条</div>
+      <div class="text-xs text-[#929399]">检索结果 · {{ searchResults.length }} 条</div>
       <div class="grid gap-3 md:grid-cols-2">
         <NoteCard
           v-for="r in searchResults"
@@ -184,8 +184,8 @@ onMounted(loadNotes)
     </div>
 
     <div v-else-if="!loading" class="surface flex flex-col items-center gap-2 px-4 py-12 text-center">
-      <div class="text-sm text-[#111827]">还没有保存的资料</div>
-      <p class="text-xs text-[#9ca3af]">回到首页粘贴文本或拖入 PDF 即可开始沉淀知识库。</p>
+      <div class="text-sm text-[#f0f1f2]">还没有保存的资料</div>
+      <p class="text-xs text-[#73747a]">回到首页粘贴文本或拖入 PDF 即可开始沉淀知识库。</p>
       <RouterLink to="/" class="btn btn-primary mt-2 h-8">返回首页</RouterLink>
     </div>
   </section>

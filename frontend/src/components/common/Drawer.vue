@@ -40,8 +40,8 @@ watch(
     <template v-if="open">
       <div class="drawer-backdrop" @click="emit('close')"></div>
       <aside class="drawer-panel" :style="{ width }" role="dialog" aria-modal="true">
-        <header class="flex items-center justify-between border-b border-[#e5e7eb] px-5 py-4">
-          <h2 class="text-sm font-semibold text-[#111827]">{{ title }}</h2>
+        <header class="flex items-center justify-between border-b border-[#24262a] px-5 py-4">
+          <h2 class="text-sm font-semibold text-[#f0f1f2]">{{ title }}</h2>
           <button class="btn btn-ghost h-8 w-8 p-0" type="button" @click="emit('close')" aria-label="Close">
             <X :size="16" />
           </button>
@@ -49,7 +49,7 @@ watch(
         <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <slot />
         </div>
-        <footer v-if="$slots.footer" class="border-t border-[#e5e7eb] px-5 py-3">
+        <footer v-if="$slots.footer" class="border-t border-[#24262a] px-5 py-3">
           <slot name="footer" />
         </footer>
       </aside>

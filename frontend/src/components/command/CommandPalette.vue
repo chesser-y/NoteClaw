@@ -208,12 +208,12 @@ function isActive(idx: number) {
     <template v-if="ui.paletteOpen">
       <div class="command-backdrop" @click="ui.closePalette()">
         <div class="command-panel" @click.stop>
-          <div class="flex items-center gap-2 border-b border-[#e5e7eb] px-4 py-3">
-            <Search :size="16" class="text-[#9ca3af]" />
+          <div class="flex items-center gap-2 border-b border-[#24262a] px-4 py-3">
+            <Search :size="16" class="text-[#73747a]" />
             <input
               ref="inputEl"
               v-model="query"
-              class="min-w-0 flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
+              class="min-w-0 flex-1 bg-transparent text-sm text-[#f0f1f2] outline-none placeholder:text-[#73747a]"
               placeholder="Ask, paste, drop, or pick a command..."
               type="text"
             />
@@ -222,28 +222,28 @@ function isActive(idx: number) {
 
           <div class="max-h-[52vh] overflow-y-auto py-2">
             <template v-for="group in grouped" :key="group.section">
-              <div class="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+              <div class="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-[#73747a]">
                 {{ group.label }}
               </div>
               <template v-for="action in group.items" :key="action.id">
                 <button
                   class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm"
-                  :class="isActive(flatItems.indexOf(action)) ? 'bg-[#eef2ff] text-[#4f46e5]' : 'text-[#111827] hover:bg-[#f3f4f6]'"
+                  :class="isActive(flatItems.indexOf(action)) ? 'bg-[rgba(98, 107, 230, 0.16)] text-[#626be6]' : 'text-[#f0f1f2] hover:bg-[#1b1c1e]'"
                   type="button"
                   @click="selectAt(flatItems.indexOf(action))"
                 >
                   <component :is="action.icon" :size="15" />
                   <span class="flex-1">{{ action.label }}</span>
-                  <span v-if="action.hint" class="text-[11px] text-[#9ca3af]">{{ action.hint }}</span>
+                  <span v-if="action.hint" class="text-[11px] text-[#73747a]">{{ action.hint }}</span>
                 </button>
               </template>
             </template>
-            <p v-if="!flatItems.length" class="px-4 py-6 text-center text-xs text-[#9ca3af]">
+            <p v-if="!flatItems.length" class="px-4 py-6 text-center text-xs text-[#73747a]">
               没有匹配的命令
             </p>
           </div>
 
-          <div class="flex items-center justify-between border-t border-[#e5e7eb] px-4 py-2 text-[11px] text-[#9ca3af]">
+          <div class="flex items-center justify-between border-t border-[#24262a] px-4 py-2 text-[11px] text-[#73747a]">
             <div class="flex items-center gap-3">
               <span class="flex items-center gap-1"><span class="kbd">↑</span><span class="kbd">↓</span> 选择</span>
               <span class="flex items-center gap-1"><span class="kbd"><CornerDownLeft :size="10" /></span> 执行</span>

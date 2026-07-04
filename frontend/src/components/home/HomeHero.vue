@@ -52,7 +52,7 @@ function onDrop(e: DragEvent) {
 <template>
   <div
     class="surface flex flex-col gap-3 p-5 transition-shadow"
-    :class="dragOver ? 'border-[#4f46e5] shadow-[0_0_0_3px_rgba(79,70,229,0.15)]' : ''"
+    :class="dragOver ? 'border-[#626be6] shadow-[0_0_0_3px_rgba(98,107,230,0.22)]' : ''"
     @dragover.prevent="dragOver = true"
     @dragleave="dragOver = false"
     @drop.prevent="onDrop"
@@ -71,7 +71,7 @@ function onDrop(e: DragEvent) {
       </button>
       <input ref="fileInput" type="file" class="hidden" accept="image/*,.pdf,.md,.txt,.csv,.json,.html,.py,.ts,.js,.go" @change="onFileChange" />
 
-      <div class="mx-1 h-4 w-px bg-[#e5e7eb]"></div>
+      <div class="mx-1 h-4 w-px bg-[#24262a]"></div>
 
       <span class="chip chip-muted"><FileText :size="11" /> Text</span>
       <span class="chip chip-muted"><Code2 :size="11" /> Code</span>

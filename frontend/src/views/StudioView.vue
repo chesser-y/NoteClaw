@@ -115,7 +115,7 @@ const previewText = computed(() => {
         placeholder="根据最近保存的资料生成一份汇报大纲…"
       ></textarea>
       <div class="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
-        <div class="flex items-center gap-2 text-[11px] text-[#9ca3af]">
+        <div class="flex items-center gap-2 text-[11px] text-[#73747a]">
           <Sparkles :size="12" />
           将生成：<span class="chip chip-muted">{{ detectedType }}</span>
         </div>
@@ -132,17 +132,17 @@ const previewText = computed(() => {
       </div>
     </div>
 
-    <p v-if="error" class="mb-5 rounded-lg border border-[#fcd9d4] bg-[#fef3f1] px-3 py-2 text-xs text-[#b42618]">
+    <p v-if="error" class="mb-5 rounded-lg border border-[#5a2520] bg-[#2a1614] px-3 py-2 text-xs text-[#f0b8ad]">
       {{ error }}
     </p>
 
     <div v-if="preview" class="surface mb-7 p-4">
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Preview · {{ preview.generation_type }}</div>
-      <pre class="max-h-[320px] overflow-auto whitespace-pre-wrap rounded-lg border border-[#e5e7eb] bg-[#fafbfc] p-3 text-xs leading-6 text-[#111827]">{{ previewText }}</pre>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[#929399]">Preview · {{ preview.generation_type }}</div>
+      <pre class="max-h-[320px] overflow-auto whitespace-pre-wrap rounded-lg border border-[#24262a] bg-[#151618] p-3 text-xs leading-6 text-[#f0f1f2]">{{ previewText }}</pre>
     </div>
 
     <div class="mb-7">
-      <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Start from</div>
+      <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#929399]">Start from</div>
       <div class="grid gap-3 sm:grid-cols-3">
         <TemplateCard
           v-for="tpl in templates"
@@ -154,15 +154,15 @@ const previewText = computed(() => {
           @click="selectTemplate(tpl.id)"
         />
       </div>
-      <p class="mt-3 text-xs text-[#9ca3af]">
+      <p class="mt-3 text-xs text-[#73747a]">
         其他能力（表格 / 图示 / 视频脚本 / PPTX）会根据自然语言隐式触发。
       </p>
     </div>
 
     <div>
       <div class="mb-3 flex items-center justify-between">
-        <div class="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Recent outputs</div>
-        <RouterLink to="/tasks" class="text-xs text-[#6b7280] hover:text-[#4f46e5]">查看全部任务 →</RouterLink>
+        <div class="text-xs font-semibold uppercase tracking-wide text-[#929399]">Recent outputs</div>
+        <RouterLink to="/tasks" class="text-xs text-[#929399] hover:text-[#626be6]">查看全部任务 →</RouterLink>
       </div>
       <div v-if="recent.length" class="space-y-2">
         <RouterLink
@@ -171,12 +171,12 @@ const previewText = computed(() => {
           :to="`/tasks?task=${t.id}`"
           class="card card-hover flex items-center gap-3 py-3"
         >
-          <Sparkles :size="14" class="text-[#4f46e5]" />
-          <span class="flex-1 truncate text-sm text-[#111827]">{{ t.type }}</span>
-          <span class="text-[11px] text-[#9ca3af]">{{ t.status }}</span>
+          <Sparkles :size="14" class="text-[#626be6]" />
+          <span class="flex-1 truncate text-sm text-[#f0f1f2]">{{ t.type }}</span>
+          <span class="text-[11px] text-[#73747a]">{{ t.status }}</span>
         </RouterLink>
       </div>
-      <p v-else class="rounded-xl border border-dashed border-[#e5e7eb] bg-white px-4 py-6 text-center text-xs text-[#9ca3af]">
+      <p v-else class="rounded-xl border border-dashed border-[#24262a] bg-[#101112] px-4 py-6 text-center text-xs text-[#73747a]">
         还没有产出。选一个模板或直接描述想生成什么。
       </p>
     </div>
