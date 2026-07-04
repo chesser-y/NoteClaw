@@ -1,24 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Filter, SlidersHorizontal } from 'lucide-vue-next'
 import { useTaskStore } from '../stores/tasks'
 import type { TaskRead, TaskStatus } from '../api/types'
 import TaskDetailDrawer from '../components/tasks/TaskDetailDrawer.vue'
 
 const store = useTaskStore()
 const selected = ref<TaskRead | null>(null)
-
-const stubReviewTask: TaskRead = {
-  id: 'task_review_sample_001',
-  type: 'generation',
-  status: 'running',
-  progress: 0.85,
-  message: 'Waiting for review',
-  result: { note: '生成项目展示 PPT 大纲，已草拟 12 张幻灯片，等待用户确认是否插入图表。' },
-  error: null,
-  created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  updated_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-}
 
 onMounted(() => store.refresh())
 
@@ -34,7 +21,7 @@ const buckets = computed(() => {
   return {
     queued,
     inProgress,
-    review: [stubReviewTask],
+    review: [] as TaskRead[],
     done,
   }
 })
@@ -63,12 +50,7 @@ function openTask(t: TaskRead) {
   <section class="tasks-view">
     <header class="topbar tight">
       <span>Tasks</span>
-      <span class="dot-menu">...</span>
       <span class="spacer"></span>
-      <span class="tool-icons">
-        <Filter :size="16" />
-        <SlidersHorizontal :size="16" />
-      </span>
     </header>
 
     <div class="kanban">

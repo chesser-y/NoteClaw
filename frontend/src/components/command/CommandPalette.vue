@@ -196,7 +196,9 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-useMagicKey(onKey)
+useMagicKey((e) => {
+  if (e.key === 'Escape' && ui.paletteOpen) ui.closePalette()
+})
 
 function isActive(idx: number) {
   return idx === activeIndex.value
@@ -213,9 +215,11 @@ function isActive(idx: number) {
             <input
               ref="inputEl"
               v-model="query"
-              class="min-w-0 flex-1 bg-transparent text-sm text-[#f0f1f2] outline-none placeholder:text-[#73747a]"
-              placeholder="Ask, paste, drop, or pick a command..."
+              class="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              :class="`text-[var(--text)] placeholder:text-[var(--muted-2)]`"
+              placeholder="搜索命令或提问…"
               type="text"
+              @keydown="onKey"
             />
             <span class="kbd">Esc</span>
           </div>
@@ -227,8 +231,8 @@ function isActive(idx: number) {
               </div>
               <template v-for="action in group.items" :key="action.id">
                 <button
-                  class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm"
-                  :class="isActive(flatItems.indexOf(action)) ? 'bg-[rgba(98, 107, 230, 0.16)] text-[#626be6]' : 'text-[#f0f1f2] hover:bg-[#1b1c1e]'"
+                  class="cmd-item flex w-full items-center gap-3 px-4 py-2 text-left text-sm"
+                  :class="{ active: isActive(flatItems.indexOf(action)) }"
                   type="button"
                   @click="selectAt(flatItems.indexOf(action))"
                 >
@@ -255,3 +259,18 @@ function isActive(idx: number) {
     </template>
   </Teleport>
 </template>
+
+<style scoped>
+.cmd-item {
+  color: var(--text);
+  border-left: 2px solid transparent;
+}
+.cmd-item:hover {
+  background: var(--panel-2);
+}
+.cmd-item.active {
+  background: rgba(98, 107, 230, 0.24);
+  color: var(--text);
+  border-left-color: var(--blue);
+}
+</style>

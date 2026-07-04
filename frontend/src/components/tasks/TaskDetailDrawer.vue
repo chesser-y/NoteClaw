@@ -73,7 +73,7 @@ const citations = computed(() => {
       <section>
         <div class="mb-2 text-xs text-[#73747a]">使用的资料</div>
         <SourceList v-if="citations.length" :sources="citations" />
-        <p v-else class="text-xs text-[#73747a]">该任务尚未关联资料，或后端 stub 还未返回引用。</p>
+        <p v-else class="text-xs text-[#73747a]">该任务尚未关联资料。</p>
       </section>
 
       <section v-if="task.result && Object.keys(task.result).length">

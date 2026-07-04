@@ -1,0 +1,110 @@
+{
+  "nav": {
+    "main": "主菜单",
+    "workspace": "工作区",
+    "favorites": "收藏",
+    "inbox": "收件",
+    "library": "资料库",
+    "research": "研究",
+    "tasks": "任务",
+    "timeline": "时间线",
+    "map": "地图",
+    "studio": "创作",
+    "review": "审阅",
+    "settings": "设置"
+  },
+  "view": {
+    "inbox": "收件",
+    "library": "资料库",
+    "research": "研究",
+    "tasks": "任务",
+    "timeline": "时间线",
+    "map": "地图",
+    "studio": "创作",
+    "review": "审阅",
+    "settings": "设置",
+    "quality": "质量与评测"
+  },
+  "tabs": {
+    "ask": "提问",
+    "browse": "浏览",
+    "focus": "聚焦",
+    "split": "分栏",
+    "new": "新建",
+    "general": "通用",
+    "advanced": "高级",
+    "capabilities": "能力",
+    "for-me": "推荐",
+    "active": "进行中",
+    "recent": "最近",
+    "planned": "计划",
+    "completed": "已完成"
+  },
+  "kanban": {
+    "queued": "待处理",
+    "in-progress": "进行中",
+    "need-review": "待审阅",
+    "done": "已完成"
+  },
+  "action": {
+    "save": "保存",
+    "ask": "提问",
+    "send": "发送",
+    "cancel": "取消",
+    "refresh": "刷新本页",
+    "view-options": "视图选项",
+    "about": "关于本页",
+    "new-chat": "新建对话",
+    "open-palette": "命令面板",
+    "all-done": "全部已处理",
+    "open-recent": "打开历史会话"
+  },
+  "empty": {
+    "inbox-recent": "暂无最近内容",
+    "inbox-chat": "提一个问题开始对话",
+    "no-chat": "没有对话内容",
+    "research": "暂无研究动态",
+    "timeline": "暂无时间线数据",
+    "map": "暂无项目地图数据",
+    "review": "所有内容已确认 ✨",
+    "review-sub": "该任务尚未关联资料。",
+    "quality": "暂无评测数据",
+    "no-items": "暂无项目",
+    "no-matches": "没有匹配的命令"
+  },
+  "menu": {
+    "workspace-title": "工作区",
+    "theme": "主题",
+    "language": "语言",
+    "theme-dark": "深色",
+    "theme-light": "浅色",
+    "lang-zh": "中文",
+    "lang-en": "English"
+  },
+  "palette": {
+    "placeholder": "搜索命令或提问…",
+    "section-navigate": "导航",
+    "section-ask": "提问",
+    "section-generate": "生成",
+    "section-harness": "nanobot",
+    "select-hint": "选择",
+    "execute-hint": "执行"
+  },
+  "settings": {
+    "frontend-config": "前端配置",
+    "preferences": "用户偏好",
+    "api-base": "API Base",
+    "framework": "框架",
+    "mode": "模式",
+    "theme": "主题",
+    "language": "语言",
+    "default-retrieval": "默认检索",
+    "advanced-quality-title": "质量与评测",
+    "advanced-quality-desc": "Recall@10 / MRR / Citation hit rate / Faithfulness / Latency 等核心指标",
+    "retrieval-tuning-title": "检索调优",
+    "retrieval-tuning-desc": "top_k / 重排阈值 / hybrid 权重 (0.45 / 0.55)",
+    "storage-title": "存储与索引",
+    "storage-desc": "SQLite + FAISS 索引状态 / 重建 / 备份",
+    "capabilities-title": "后端能力边界"
+  }
+}

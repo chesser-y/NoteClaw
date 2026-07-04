@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { Plus, FileText, Image as ImageIcon, Code2, Table as TableIcon, Send } from 'lucide-vue-next'
+import { FileText, Image as ImageIcon, Code2, Table as TableIcon, Send, MoreHorizontal } from "lucide-vue-next"
 import { useUiStore } from '../stores/ui'
 import { useChatStore } from '../stores/chat'
 import { useIngest } from '../composables/useIngest'
+import { useHorizontalDrag } from '../composables/useDrag'
 import { listKnowledge } from '../api/knowledge'
 import { listTasks } from '../api/tasks'
 import type { NoteListItem, TaskRead } from '../api/types'
@@ -16,6 +17,8 @@ type Mode = 'hero' | 'split' | 'chat'
 const ui = useUiStore()
 const chat = useChatStore()
 const ingest = useIngest()
+
+const splitWidth = useHorizontalDrag({ initial: 482, min: 320, max: 760, storageKey: 'noteclaw.inbox-split' })
 
 const mode = ref<Mode>('hero')
 const recent = ref<NoteListItem[]>([])
@@ -106,7 +109,15 @@ void hasConversation
   <section class="inbox-view">
     <header class="topbar">
       <span>Inbox</span>
-      <span class="dot-menu">...</span>
+      <button
+        class="icon-button"
+        type="button"
+        :aria-pressed="mode !== 'hero'"
+        :title="mode === 'hero' ? '打开历史会话' : '返回首页'"
+        @click="mode === 'hero' ? (mode = 'split') : backToHero()"
+      >
+        <MoreHorizontal :size="16" />
+      </button>
       <span class="spacer"></span>
       <div class="tabs" v-if="mode !== 'hero'">
         <button class="tab" :class="{ active: tab === 'ask' }" @click="tab = 'ask'">Ask</button>
@@ -114,9 +125,6 @@ void hasConversation
         <button class="tab" @click="focusChat">{{ mode === 'chat' ? 'Split' : 'Focus' }}</button>
         <button class="tab" @click="backToHero">New</button>
       </div>
-      <span class="tool-icons">
-        <Plus :size="16" @click="ui.openPalette()" style="cursor: pointer;" />
-      </span>
     </header>
 
     <!-- HERO MODE -->
@@ -146,7 +154,11 @@ void hasConversation
     </div>
 
     <!-- SPLIT MODE -->
-    <div v-else-if="mode === 'split'" class="inbox-layout">
+    <div
+      v-else-if="mode === 'split'"
+      class="inbox-layout"
+      :style="{ gridTemplateColumns: splitWidth.size.value + 'px 4px 1fr' }"
+    >
       <div class="inbox-list">
         <div class="inbox-items">
           <div class="section-title" style="font-size: 13px; padding: 6px 14px; color: #6f7480; font-weight: 700;">
@@ -156,6 +168,8 @@ void hasConversation
             v-for="item in recent"
             :key="item.id"
             class="inbox-card"
+            style="cursor: pointer;"
+            @click="ui.openAsk({ noteIds: [item.id], title: item.title })"
           >
             <component :is="iconFor(item.content_type)" :size="16" style="color: #747983;" />
             <div>
@@ -172,6 +186,8 @@ void hasConversation
             v-for="t in tasks"
             :key="t.id"
             class="inbox-card"
+            style="cursor: pointer;"
+            @click="ui.openAsk({ noteIds: [], title: t.type })"
           >
             <span class="status-ring" :class="{ green: t.status === 'succeeded', gray: t.status === 'failed' }"></span>
             <div>
@@ -186,6 +202,8 @@ void hasConversation
           </div>
         </div>
       </div>
+
+      <div class="split-handle" @mousedown="splitWidth.start"></div>
 
       <div class="chat-panel">
         <div class="chat-messages">

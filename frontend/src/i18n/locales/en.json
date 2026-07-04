@@ -1,0 +1,109 @@
+{
+  "nav": {
+    "main": "Main",
+    "workspace": "Workspace",
+    "favorites": "Favorites",
+    "inbox": "Inbox",
+    "library": "Library",
+    "research": "Research",
+    "tasks": "Tasks",
+    "timeline": "Timeline",
+    "map": "Map",
+    "studio": "Studio",
+    "review": "Review",
+    "settings": "Settings"
+  },
+  "view": {
+    "inbox": "Inbox",
+    "library": "Library",
+    "research": "Research",
+    "tasks": "Tasks",
+    "timeline": "Timeline",
+    "map": "Map",
+    "studio": "Studio",
+    "review": "Review",
+    "settings": "Settings",
+    "quality": "Quality & Evaluation"
+  },
+  "tabs": {
+    "ask": "Ask",
+    "browse": "Browse",
+    "focus": "Focus",
+    "split": "Split",
+    "new": "New",
+    "general": "General",
+    "advanced": "Advanced",
+    "capabilities": "Capabilities",
+    "for-me": "For me",
+    "active": "Active",
+    "recent": "Recent",
+    "planned": "Planned",
+    "completed": "Completed"
+  },
+  "kanban": {
+    "queued": "Queued",
+    "in-progress": "In progress",
+    "need-review": "Need review",
+    "done": "Done"
+  },
+  "action": {
+    "save": "Save",
+    "ask": "Ask",
+    "send": "Send",
+    "cancel": "Cancel",
+    "refresh": "Refresh",
+    "view-options": "View options",
+    "about": "About this view",
+    "new-chat": "New chat",
+    "open-palette": "Open palette",
+    "all-done": "Mark all reviewed"
+  },
+  "empty": {
+    "inbox-recent": "No recent items",
+    "inbox-chat": "Ask a question to start",
+    "no-chat": "No conversation yet",
+    "research": "No research activity",
+    "timeline": "No timeline data",
+    "map": "No map data",
+    "review": "Everything reviewed ✨",
+    "review-sub": "This task has no linked sources yet.",
+    "quality": "No evaluation data",
+    "no-items": "No items",
+    "no-matches": "No matching commands"
+  },
+  "menu": {
+    "workspace-title": "Workspace",
+    "theme": "Theme",
+    "language": "Language",
+    "theme-dark": "Dark",
+    "theme-light": "Light",
+    "lang-zh": "中文",
+    "lang-en": "English"
+  },
+  "palette": {
+    "placeholder": "Search a command or ask…",
+    "section-navigate": "Navigate",
+    "section-ask": "Ask NoteClaw",
+    "section-generate": "Generate",
+    "section-harness": "nanobot",
+    "select-hint": "select",
+    "execute-hint": "run"
+  },
+  "settings": {
+    "frontend-config": "Frontend config",
+    "preferences": "Preferences",
+    "api-base": "API Base",
+    "framework": "Framework",
+    "mode": "Mode",
+    "theme": "Theme",
+    "language": "Language",
+    "default-retrieval": "Default retrieval",
+    "advanced-quality-title": "Quality & Evaluation",
+    "advanced-quality-desc": "Recall@10 / MRR / Citation hit rate / Faithfulness / Latency metrics",
+    "retrieval-tuning-title": "Retrieval Tuning",
+    "retrieval-tuning-desc": "top_k / rerank threshold / hybrid weights (0.45 / 0.55)",
+    "storage-title": "Storage & Index",
+    "storage-desc": "SQLite + FAISS index status / rebuild / backup",
+    "capabilities-title": "Backend capabilities"
+  }
+}

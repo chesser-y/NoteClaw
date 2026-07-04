@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Plus, Filter } from 'lucide-vue-next'
-import { useUiStore } from '../stores/ui'
 
-const ui = useUiStore()
 const tab = ref<'active' | 'planned' | 'completed'>('active')
 
 type Row = {
@@ -20,21 +17,7 @@ type Row = {
   projects?: string
 }
 
-const rows: Row[] = [
-  { indent: 0, name: 'Research', icon: '⌂', iconColor: '', target: '2026', health: 'on', projects: '34 / 102', sources: 87, tasks: 12 },
-  { indent: 1, name: 'RAG', icon: '▣', iconColor: '', iconSmall: true, target: '2026', health: 'on', projects: '12 / 38', sources: 44, tasks: 4 },
-  { indent: 2, name: 'PDF RAG', detail: 'Multimodal PDF understanding', icon: '●', iconColor: '', iconSmall: true, target: 'Q3 2026', health: 'on', projects: '6 / 14', sources: 24, tasks: 3 },
-  { indent: 2, name: 'Visual Documents', detail: 'docVQA / infovqa / arxivqa', icon: '●', iconColor: 'cyan', iconSmall: true, target: 'Q3 2026', health: 'on', projects: '4 / 12', sources: 12, tasks: 1 },
-  { indent: 2, name: 'Chinese Retrieval', detail: 'T2Retrieval evaluation', icon: '●', iconColor: 'red', iconSmall: true, target: 'Q4 2026', health: 'risk', projects: '2 / 8', sources: 8, tasks: 0 },
-  { indent: 1, name: 'Agent', icon: '✦', iconColor: '', iconSmall: true, target: '2026', health: 'risk', projects: '8 / 24', sources: 14, tasks: 3 },
-  { indent: 2, name: 'Task execution', detail: 'Harness jobs and step traces', icon: '●', iconColor: '', iconSmall: true, target: 'H2 2026', health: 'on', projects: '3 / 9', sources: 6, tasks: 2 },
-  { indent: 2, name: 'Multi-document reasoning', detail: 'Cross-note comparison', icon: '●', iconColor: 'cyan', iconSmall: true, target: 'Q4 2026', health: 'off', projects: '1 / 6', sources: 4, tasks: 1 },
-  { indent: 1, name: 'Note-taking UX', icon: '▯', iconColor: '', iconSmall: true, target: '2026', health: 'on', projects: '14 / 40', sources: 29, tasks: 5 },
-  { indent: 2, name: 'Capture', detail: 'Multimodal inbox flow', icon: '●', iconColor: '', iconSmall: true, target: 'Q3 2026', health: 'on', projects: '4 / 12', sources: 9, tasks: 2 },
-  { indent: 2, name: 'Review', detail: 'Triage, dedupe, OCR confidence', icon: '●', iconColor: 'red', iconSmall: true, target: 'Q3 2026', health: 'risk', projects: '3 / 8', sources: 7, tasks: 1 },
-  { indent: 2, name: 'Personalization', detail: 'Tag/category quality', icon: '●', iconColor: 'cyan', iconSmall: true, target: 'Q4 2026', health: 'on', projects: '2 / 6', sources: 5, tasks: 0 },
-  { indent: 0, name: 'Product', icon: '⌂', iconColor: 'red', target: '2026', health: 'on', projects: '8 / 24', sources: 12, tasks: 3 },
-]
+const rows: Row[] = []
 
 const healthClass = (h?: Row['health']) => (h === 'risk' ? 'risk' : h === 'off' ? 'off' : '')
 const healthLabel = (h?: Row['health']) => (h === 'risk' ? '↗ At risk' : h === 'off' ? '↘ Off track' : '↗ On track')
@@ -44,12 +27,7 @@ const healthLabel = (h?: Row['health']) => (h === 'risk' ? '↗ At risk' : h ===
   <section class="map-view">
     <header class="topbar tight">
       <span>Map</span>
-      <span class="dot-menu">...</span>
       <span class="spacer"></span>
-      <span class="tool-icons">
-        <Filter :size="16" />
-        <Plus :size="16" @click="ui.openPalette()" style="cursor: pointer;" />
-      </span>
     </header>
 
     <header class="topbar tight">
@@ -68,6 +46,9 @@ const healthLabel = (h?: Row['health']) => (h === 'risk' ? '↗ At risk' : h ===
         <div>Activity</div>
       </div>
       <div class="initiative-body">
+        <div v-if="!rows.length" class="placeholder" style="padding: 60px 16px; font-size: 13px;">
+          暂无项目地图数据
+        </div>
         <div
           v-for="(row, i) in rows"
           :key="i"

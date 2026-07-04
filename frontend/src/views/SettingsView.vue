@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronRight, Activity, SlidersHorizontal, Boxes } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+import { ChevronRight, Activity, SlidersHorizontal, Boxes } from "lucide-vue-next"
+import { useUiStore } from '../stores/ui'
 import { API_BASE } from '../api/http'
 
 const router = useRouter()
+const ui = useUiStore()
+const { t } = useI18n()
 const tab = ref<'general' | 'advanced' | 'capabilities'>('general')
 </script>
 
@@ -12,7 +16,6 @@ const tab = ref<'general' | 'advanced' | 'capabilities'>('general')
   <section class="settings-view">
     <header class="topbar tight">
       <span>Settings</span>
-      <span class="dot-menu">...</span>
       <span class="spacer"></span>
     </header>
 
@@ -42,18 +45,48 @@ const tab = ref<'general' | 'advanced' | 'capabilities'>('general')
       </div>
 
       <div class="surface" style="padding: 18px;">
-        <h3 style="margin: 0 0 12px; color: var(--text); font-size: 14px; font-weight: 700;">用户偏好</h3>
+        <h3 style="margin: 0 0 12px; color: var(--text); font-size: 14px; font-weight: 700;">{{ t('settings.preferences') }}</h3>
         <div class="side-meta">
           <div class="side-row">
-            <span class="label">主题</span>
-            <span>Linear Dark</span>
+            <span class="label">{{ t('menu.theme') }}</span>
+            <div class="seg" style="display: inline-flex; background: var(--panel-2); border-radius: 6px; padding: 1px; gap: 1px;">
+              <button
+                type="button"
+                :class="{ active: ui.theme === 'dark' }"
+                style="border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 5px; cursor: pointer;"
+                :style="ui.theme === 'dark' ? { background: 'var(--panel-3)', color: 'var(--text)' } : {}"
+                @click="ui.setTheme('dark')"
+              >{{ t('menu.theme-dark') }}</button>
+              <button
+                type="button"
+                :class="{ active: ui.theme === 'light' }"
+                style="border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 5px; cursor: pointer;"
+                :style="ui.theme === 'light' ? { background: 'var(--panel-3)', color: 'var(--text)' } : {}"
+                @click="ui.setTheme('light')"
+              >{{ t('menu.theme-light') }}</button>
+            </div>
           </div>
           <div class="side-row">
-            <span class="label">语言</span>
-            <span>中文 / English</span>
+            <span class="label">{{ t('menu.language') }}</span>
+            <div class="seg" style="display: inline-flex; background: var(--panel-2); border-radius: 6px; padding: 1px; gap: 1px;">
+              <button
+                type="button"
+                :class="{ active: ui.locale === 'zh' }"
+                style="border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 5px; cursor: pointer;"
+                :style="ui.locale === 'zh' ? { background: 'var(--panel-3)', color: 'var(--text)' } : {}"
+                @click="ui.setLocale('zh')"
+              >{{ t('menu.lang-zh') }}</button>
+              <button
+                type="button"
+                :class="{ active: ui.locale === 'en' }"
+                style="border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 5px; cursor: pointer;"
+                :style="ui.locale === 'en' ? { background: 'var(--panel-3)', color: 'var(--text)' } : {}"
+                @click="ui.setLocale('en')"
+              >{{ t('menu.lang-en') }}</button>
+            </div>
           </div>
           <div class="side-row">
-            <span class="label">默认检索</span>
+            <span class="label">{{ t('settings.default-retrieval') }}</span>
             <span class="mono">hybrid</span>
           </div>
         </div>

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Plus, Filter, SlidersHorizontal } from 'lucide-vue-next'
 import { listKnowledge } from '../api/knowledge'
 import type { ContentType, NoteListItem } from '../api/types'
-import { useUiStore } from '../stores/ui'
-
-const ui = useUiStore()
 
 const items = ref<NoteListItem[]>([])
 const total = ref(0)
@@ -91,13 +87,7 @@ const filteredItems = computed(() => items.value)
   <section class="library-view">
     <header class="topbar tight">
       <span>Library</span>
-      <span class="dot-menu">...</span>
       <span class="spacer"></span>
-      <span class="tool-icons">
-        <Filter :size="16" />
-        <SlidersHorizontal :size="16" />
-        <Plus :size="16" @click="ui.openPalette()" style="cursor: pointer;" />
-      </span>
     </header>
 
     <header class="topbar tight" style="gap: 12px;">

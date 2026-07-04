@@ -12,25 +12,29 @@ import {
   Search,
   Plus,
 } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { useUiStore } from '../../stores/ui'
 import { useMagicKey } from '../../composables/useMagicKey'
 import AskPanel from '../ask/AskPanel.vue'
 import CommandPalette from '../command/CommandPalette.vue'
+import ThemeToggle from './ThemeToggle.vue'
+import WorkspaceMenu from './WorkspaceMenu.vue'
 
 const ui = useUiStore()
+const { t } = useI18n()
 
 const mainItems = [
-  { to: '/', label: 'Inbox', icon: Inbox },
-  { to: '/library', label: 'Library', icon: Library },
-  { to: '/research', label: 'Research', icon: Telescope },
-  { to: '/tasks', label: 'Tasks', icon: Workflow },
+  { to: '/', label: 'nav.inbox', icon: Inbox },
+  { to: '/library', label: 'nav.library', icon: Library },
+  { to: '/research', label: 'nav.research', icon: Telescope },
+  { to: '/tasks', label: 'nav.tasks', icon: Workflow },
 ]
 
 const workspaceItems = [
-  { to: '/timeline', label: 'Timeline', icon: Clock },
-  { to: '/map', label: 'Map', icon: MapIcon },
-  { to: '/studio', label: 'Studio', icon: Sparkles },
-  { to: '/review', label: 'Review', icon: CheckCircle },
+  { to: '/timeline', label: 'nav.timeline', icon: Clock },
+  { to: '/map', label: 'nav.map', icon: MapIcon },
+  { to: '/studio', label: 'nav.studio', icon: Sparkles },
+  { to: '/review', label: 'nav.review', icon: CheckCircle },
 ]
 
 useMagicKey((e) => {
@@ -45,20 +49,14 @@ useMagicKey((e) => {
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-avatar">NC</div>
-        <div class="brand-name">
-          <span>NoteClaw</span>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
+        <WorkspaceMenu />
         <div class="brand-actions">
           <button class="icon-button" type="button" aria-label="Search" @click="ui.openPalette()">
             <Search :size="16" />
           </button>
-          <button class="icon-button filled" type="button" aria-label="Compose" @click="ui.openPalette()">
+          <RouterLink to="/" class="icon-button filled" aria-label="Compose">
             <Plus :size="16" />
-          </button>
+          </RouterLink>
         </div>
       </div>
 
@@ -72,14 +70,14 @@ useMagicKey((e) => {
               class="nav-link"
             >
               <component :is="item.icon" :size="16" />
-              <span>{{ item.label }}</span>
+              <span>{{ t(item.label) }}</span>
             </RouterLink>
           </div>
         </div>
 
         <div class="nav-section">
           <div class="nav-heading">
-            <span>Workspace</span>
+            <span>{{ t('nav.workspace') }}</span>
             <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="margin-left: auto;">
               <path d="M4 6l4 5 4-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -92,14 +90,14 @@ useMagicKey((e) => {
               class="nav-link"
             >
               <component :is="item.icon" :size="16" />
-              <span>{{ item.label }}</span>
+              <span>{{ t(item.label) }}</span>
             </RouterLink>
           </div>
         </div>
 
         <div class="nav-section">
           <div class="nav-heading">
-            <span>Favorites</span>
+            <span>{{ t('nav.favorites') }}</span>
             <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="margin-left: auto;">
               <path d="M4 6l4 5 4-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -116,8 +114,12 @@ useMagicKey((e) => {
           <div class="nav-list">
             <RouterLink to="/settings" class="nav-link">
               <Settings :size="16" />
-              <span>Settings</span>
+              <span>{{ t('nav.settings') }}</span>
             </RouterLink>
+            <div class="nav-link theme-row" style="cursor: default;">
+              <span style="flex: 1;"></span>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </nav>
@@ -141,5 +143,11 @@ useMagicKey((e) => {
 .muted-static:hover {
   background: transparent;
   color: #929399;
+}
+.theme-row {
+  padding-right: 4px;
+}
+.theme-row:hover {
+  background: transparent;
 }
 </style>

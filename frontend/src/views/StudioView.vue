@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Sparkles, FileText, Presentation, StickyNote, Send, Loader2, Plus, Filter } from 'lucide-vue-next'
+import { Sparkles, FileText, Presentation, StickyNote, Send, Loader2 } from "lucide-vue-next"
 import { previewGeneration, createGenerationTask } from '../api/generate'
 import { listTasks } from '../api/tasks'
 import type { GenerationType, TaskRead, GenerationPreviewResponse } from '../api/types'
@@ -49,7 +49,7 @@ async function loadRecent() {
 function selectTemplate(id: TemplateId) {
   activeTemplate.value = id
   const tpl = templates.find((t) => t.id === id)
-  if (tpl && !prompt.value.trim()) prompt.value = tpl.promptHint
+  if (tpl) prompt.value = tpl.promptHint
 }
 
 async function submit(asyncMode: boolean) {
@@ -113,12 +113,7 @@ function sendAgent() {
   <section class="studio-view">
     <header class="topbar tight">
       <span>Studio</span>
-      <span class="dot-menu">...</span>
       <span class="spacer"></span>
-      <span class="tool-icons">
-        <Filter :size="16" />
-        <Plus :size="16" />
-      </span>
     </header>
 
     <div class="favorite-page">
