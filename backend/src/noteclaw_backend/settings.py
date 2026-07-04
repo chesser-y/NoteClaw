@@ -14,6 +14,21 @@ class Settings(BaseSettings):
 
     openai_compat_base_url: str | None = None
     openai_compat_api_key: str | None = None
+    openai_compat_chat_api_key: str | None = None
+    openai_compat_chat_base_url: str | None = None
+    openai_compat_chat_model: str | None = None
+    openai_compat_embedding_api_key: str | None = None
+    openai_compat_embedding_base_url: str | None = None
+    openai_compat_embedding_model: str | None = None
+    openai_compat_vision_api_key: str | None = None
+    openai_compat_vision_base_url: str | None = None
+    openai_compat_vision_model: str | None = None
+    openai_compat_ocr_api_key: str | None = None
+    openai_compat_ocr_base_url: str | None = None
+    openai_compat_ocr_model: str | None = None
+    openai_compat_image_api_key: str | None = None
+    openai_compat_image_base_url: str | None = None
+    openai_compat_image_model: str | None = None
     llm_model: str | None = None
     embedding_model: str | None = None
     vision_model: str | None = None
