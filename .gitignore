@@ -3,5 +3,10 @@ backend/.env
 backend/storage/
 frontend/node_modules/
 frontend/dist/
+data/*
+!data/demo_subset/
+!data/demo_subset/**
 *.pyc
 __pycache__/
+references/
+.ipynb_checkpoints/

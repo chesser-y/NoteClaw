@@ -8,7 +8,9 @@ from noteclaw_backend.schemas.chat import (
     ChatSessionCreate,
     ChatSessionRead,
 )
+from noteclaw_backend.schemas.reasoning import ReasoningRequest, ReasoningResponse
 from noteclaw_backend.services.chat import chat_service
+from noteclaw_backend.services.reasoning import reasoning_service
 
 
 router = APIRouter()
@@ -25,3 +27,8 @@ async def send_chat_message(
     request: ChatMessageRequest,
 ) -> ChatMessageResponse:
     return await chat_service.send_message(session_id, request)
+
+
+@router.post("/reason", response_model=ReasoningResponse)
+async def reason_over_knowledge(request: ReasoningRequest) -> ReasoningResponse:
+    return await reasoning_service.reason(request)

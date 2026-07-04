@@ -1,0 +1,220 @@
+{
+  "created_at": "2026-07-04T13:33:30Z",
+  "purpose": "Small non-destructive demo subset extracted from raw datasets for NoteClaw MVP ingestion/search/chat/generation demos.",
+  "source_root": "NoteClaw/data",
+  "items": [
+    {
+      "kind": "text",
+      "path": "text/t2_1.md",
+      "source": "NoteClaw/data/T2Retrieval/corpus/dev-00000-of-00001.parquet",
+      "note": "Chinese retrieval document paired with a real query.",
+      "bytes": 662,
+      "query": "蜂巢取快递验证码摁错怎么办",
+      "corpus_id": "159474"
+    },
+    {
+      "kind": "text",
+      "path": "text/t2_2.md",
+      "source": "NoteClaw/data/T2Retrieval/corpus/dev-00000-of-00001.parquet",
+      "note": "Chinese retrieval document paired with a real query.",
+      "bytes": 1054,
+      "query": "蜂巢取快递验证码摁错怎么办",
+      "corpus_id": "159475"
+    },
+    {
+      "kind": "text",
+      "path": "text/arxiv_2410.14077v2_qa.md",
+      "source": "NoteClaw/data/open_ragbench/pdf/arxiv/corpus/2410.14077v2.json",
+      "note": "Paper section paired with real Open-RAGBench QA.",
+      "bytes": 9410,
+      "query": "What are the challenges in estimating output impedance in inverter-based grids?",
+      "answer": "Estimating output impedance in inverter-based grids is challenging due to dynamic grid conditions, which require real-time estimation. Traditional methods like signal injection and historical data analysis have limitations, such as sensitivity to noise and complexity.",
+      "doc_id": "2410.14077v2"
+    },
+    {
+      "kind": "table",
+      "path": "tables/spatial_transcriptomics_feature_mae.csv",
+      "source": "NoteClaw/data/open_ragbench/pdf/arxiv/corpus/2401.02564v2.json",
+      "note": "Small structured CSV converted from an Open-RAGBench paper table.",
+      "bytes": 199,
+      "title": "Predicting Future States with Spatial Point Processes in Single Molecule\n  Resolution Spatial Transcriptomics"
+    },
+    {
+      "kind": "code",
+      "path": "code/python_YouTube.get_vid_from_url.py",
+      "source": "NoteClaw/data/code_search_net/python/test-00000-of-00001.parquet",
+      "note": "Real function snippet from CodeSearchNet test split.",
+      "bytes": 565,
+      "language": "python",
+      "function": "YouTube.get_vid_from_url",
+      "documentation": "Extracts video ID from URL."
+    },
+    {
+      "kind": "code",
+      "path": "code/javascript_createInstance.js",
+      "source": "NoteClaw/data/code_search_net/javascript/test-00000-of-00001.parquet",
+      "note": "Real function snippet from CodeSearchNet test split.",
+      "bytes": 574,
+      "language": "javascript",
+      "function": "createInstance",
+      "documentation": "Create an instance of Axios\n\n@param {Object} defaultConfig The default config for the instance\n@return {Axios} A new instance of Axios"
+    },
+    {
+      "kind": "code",
+      "path": "code/go_mustWaitPinReady.go",
+      "source": "NoteClaw/data/code_search_net/go/test-00000-of-00001.parquet",
+      "note": "Real function snippet from CodeSearchNet test split.",
+      "bytes": 482,
+      "language": "go",
+      "function": "mustWaitPinReady",
+      "documentation": "// mustWaitPinReady waits up to 3-second until connection is up (pin endpoint).\n// Fatal on time-out."
+    },
+    {
+      "kind": "code",
+      "path": "code/ruby_KubernetesDeploy.KubernetesResource.fetch_events.rb",
+      "source": "NoteClaw/data/code_search_net/ruby/test-00000-of-00001.parquet",
+      "note": "Real function snippet from CodeSearchNet test split.",
+      "bytes": 882,
+      "language": "ruby",
+      "function": "KubernetesDeploy.KubernetesResource.fetch_events",
+      "documentation": "Returns a hash in the following format:\n {\n   \"pod/web-1\" => [\n     \"Pulling: pulling image \"hello-world:latest\" (1 events)\",\n     \"Pulled: Successfully pulled image \"hello-world:latest\" (1 events)\"\n   ]\n }"
+    },
+    {
+      "kind": "image",
+      "path": "images/document_question_page.png",
+      "source": "docvqa",
+      "note": "Image extracted from Vidore parquet for OCR/vision upload demo.",
+      "bytes": 123486,
+      "source_dataset": "docvqa",
+      "source_parquet": "NoteClaw/data/vidore/docvqa_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "What is the dividend payout in 2012?",
+      "answer": null,
+      "image_filename": "rnbx0223",
+      "page": "193",
+      "caption": null
+    },
+    {
+      "kind": "metadata",
+      "path": "images/document_question_page.md",
+      "source": "docvqa",
+      "note": "Human-readable metadata sidecar for image sample.",
+      "bytes": 247,
+      "source_dataset": "docvqa",
+      "source_parquet": "NoteClaw/data/vidore/docvqa_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "What is the dividend payout in 2012?",
+      "answer": null,
+      "image_filename": "rnbx0223",
+      "page": "193",
+      "caption": null
+    },
+    {
+      "kind": "image",
+      "path": "images/infographic_question.png",
+      "source": "infovqa",
+      "note": "Image extracted from Vidore parquet for OCR/vision upload demo.",
+      "bytes": 1312403,
+      "source_dataset": "infovqa",
+      "source_parquet": "NoteClaw/data/vidore/infovqa_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "Which category of apps enjoy the least percentage of popularity?",
+      "answer": null,
+      "image_filename": "https://blog.hubspot.com/hs-fs/hub/53/file-250043455-jpg/Blog-Related_Images/KontestappInfographic.jpg?width=645&amp;name=KontestappInfographic.jpg",
+      "page": null,
+      "caption": null
+    },
+    {
+      "kind": "metadata",
+      "path": "images/infographic_question.md",
+      "source": "infovqa",
+      "note": "Human-readable metadata sidecar for image sample.",
+      "bytes": 405,
+      "source_dataset": "infovqa",
+      "source_parquet": "NoteClaw/data/vidore/infovqa_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "Which category of apps enjoy the least percentage of popularity?",
+      "answer": null,
+      "image_filename": "https://blog.hubspot.com/hs-fs/hub/53/file-250043455-jpg/Blog-Related_Images/KontestappInfographic.jpg?width=645&amp;name=KontestappInfographic.jpg",
+      "page": null,
+      "caption": null
+    },
+    {
+      "kind": "image",
+      "path": "images/financial_table_image.png",
+      "source": "tabfquad",
+      "note": "Image extracted from Vidore parquet for OCR/vision upload demo.",
+      "bytes": 222653,
+      "source_dataset": "tabfquad",
+      "source_parquet": "NoteClaw/data/vidore/tabfquad_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "Quelles étaient les principales composantes du bénéfice net par action d'une entreprise pour les années 2016 et 2017?",
+      "answer": null,
+      "image_filename": "/home/manuel/Downloads/test/2315.png",
+      "page": null,
+      "caption": "Ce tableau présente des données financières d'une entreprise pour les années 2016 et 2017. On retrouve le bénéfice net qui exclut certains éléments non récurrents, comme l'amortissement des incorporels liés aux acquisitions. Il montre aussi l'impact de la réévaluation des instruments de dette sur le résultat net courant. Le tableau détaille le nombre d'actions impliquées dans le calcul du bénéfice net par action (BNPA), en tenant compte des actions existantes au début de la période, celles créées et celles propres à déduire. Il présente également l'effet de dilution dû aux actions gratuites et aux bons de souscription, aboutissant au nombre d'actions dilué, puis le BNPA courant et dilué pour chaque année, exprimé en euros."
+    },
+    {
+      "kind": "metadata",
+      "path": "images/financial_table_image.md",
+      "source": "tabfquad",
+      "note": "Human-readable metadata sidecar for image sample.",
+      "bytes": 1128,
+      "source_dataset": "tabfquad",
+      "source_parquet": "NoteClaw/data/vidore/tabfquad_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "Quelles étaient les principales composantes du bénéfice net par action d'une entreprise pour les années 2016 et 2017?",
+      "answer": null,
+      "image_filename": "/home/manuel/Downloads/test/2315.png",
+      "page": null,
+      "caption": "Ce tableau présente des données financières d'une entreprise pour les années 2016 et 2017. On retrouve le bénéfice net qui exclut certains éléments non récurrents, comme l'amortissement des incorporels liés aux acquisitions. Il montre aussi l'impact de la réévaluation des instruments de dette sur le résultat net courant. Le tableau détaille le nombre d'actions impliquées dans le calcul du bénéfice net par action (BNPA), en tenant compte des actions existantes au début de la période, celles créées et celles propres à déduire. Il présente également l'effet de dilution dû aux actions gratuites et aux bons de souscription, aboutissant au nombre d'actions dilué, puis le BNPA courant et dilué pour chaque année, exprimé en euros."
+    },
+    {
+      "kind": "image",
+      "path": "images/paper_graph_question.png",
+      "source": "arxiv_qa",
+      "note": "Image extracted from Vidore parquet for OCR/vision upload demo.",
+      "bytes": 472446,
+      "source_dataset": "arxivqa",
+      "source_parquet": "NoteClaw/data/vidore/arxivqa_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "Based on the graph, what is the impact of correcting for fspec not equal to 1 on the surface density trend?",
+      "answer": "C",
+      "image_filename": "images/1810.10511_2.jpg",
+      "page": "",
+      "caption": null
+    },
+    {
+      "kind": "metadata",
+      "path": "images/paper_graph_question.md",
+      "source": "arxiv_qa",
+      "note": "Human-readable metadata sidecar for image sample.",
+      "bytes": 337,
+      "source_dataset": "arxivqa",
+      "source_parquet": "NoteClaw/data/vidore/arxivqa_test_subsampled/data/test-00000-of-00001.parquet",
+      "query": "Based on the graph, what is the impact of correcting for fspec not equal to 1 on the surface density trend?",
+      "answer": "C",
+      "image_filename": "images/1810.10511_2.jpg",
+      "page": "",
+      "caption": null
+    },
+    {
+      "kind": "qa",
+      "path": "qa/demo_questions.json",
+      "source": "assembled from demo_subset manifest",
+      "note": "Suggested questions for search/chat demo.",
+      "bytes": 1280
+    },
+    {
+      "kind": "readme",
+      "path": "README.md",
+      "source": "generated",
+      "note": "Instructions for using the demo subset.",
+      "bytes": 1152
+    },
+    {
+      "kind": "cross_modal_pair",
+      "path": "cross_modal_pairs/open_ragbench_2410.14077v2_section_1/pair.json",
+      "source": "NoteClaw/data/open_ragbench/pdf/arxiv/corpus/2410.14077v2.json",
+      "note": "Text query matched to a document section with linked extracted images.",
+      "bytes": 1123,
+      "query": "What are the challenges in estimating output impedance in inverter-based grids?",
+      "doc_id": "2410.14077v2",
+      "section_id": 1,
+      "image_count": 1
+    }
+  ]
+}

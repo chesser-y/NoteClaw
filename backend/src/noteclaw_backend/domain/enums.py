@@ -27,6 +27,12 @@ class SearchMode(StrEnum):
     HYBRID = "hybrid"
 
 
+class ChatReasoningMode(StrEnum):
+    NORMAL = "normal"
+    DEEP = "deep"
+    WEB = "web"
+
+
 class TaskStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"

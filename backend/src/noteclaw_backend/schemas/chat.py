@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from noteclaw_backend.domain.enums import SearchMode
+from noteclaw_backend.domain.enums import ChatReasoningMode, SearchMode
 from noteclaw_backend.schemas.common import Citation, Scope
 
 
@@ -23,8 +23,13 @@ class ChatSessionRead(BaseModel):
 class ChatMessageRequest(BaseModel):
     message: str = Field(min_length=1)
     retrieval_mode: SearchMode = SearchMode.HYBRID
+    reasoning_mode: ChatReasoningMode = ChatReasoningMode.NORMAL
     use_nanobot_reasoning: bool = False
+    use_web_research: bool = False
     top_k: int = Field(default=8, ge=1, le=30)
+    max_reasoning_steps: int = Field(default=4, ge=1, le=8)
+    web_results: int = Field(default=4, ge=1, le=10)
+    fetch_web_pages: bool = True
 
 
 class ChatTrace(BaseModel):

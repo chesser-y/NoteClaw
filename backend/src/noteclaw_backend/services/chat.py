@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from noteclaw_backend.domain.enums import ChatReasoningMode
 from noteclaw_backend.schemas.chat import (
     ChatMessageRequest,
     ChatMessageResponse,
@@ -8,7 +9,11 @@ from noteclaw_backend.schemas.chat import (
     ChatTrace,
 )
 from noteclaw_backend.schemas.common import Citation, Scope, new_id, utc_now
+from noteclaw_backend.schemas.nanobot import NanobotResearchRequest
+from noteclaw_backend.schemas.reasoning import ReasoningRequest
 from noteclaw_backend.services.providers import get_llm_provider
+from noteclaw_backend.services.nanobot_research import nanobot_research_service
+from noteclaw_backend.services.reasoning import reasoning_service
 from noteclaw_backend.services.retrieval import retrieval_service
 from noteclaw_backend.settings import get_settings
 
@@ -31,7 +36,80 @@ class ChatService:
         session_id: str,
         request: ChatMessageRequest,
     ) -> ChatMessageResponse:
-        scope = self._session_scopes.get(session_id, Scope()).model_dump()
+        session_scope = self._session_scopes.get(session_id, Scope())
+        scope = session_scope.model_dump()
+        reasoning_mode = self._resolve_reasoning_mode(request)
+
+        if reasoning_mode == ChatReasoningMode.WEB:
+            research = await nanobot_research_service.research(
+                NanobotResearchRequest(
+                    question=request.message,
+                    retrieval_mode=request.retrieval_mode,
+                    scope=session_scope,
+                    top_k=min(request.top_k, 20),
+                    max_steps=request.max_reasoning_steps,
+                    max_sub_questions=request.max_reasoning_steps,
+                    use_web=True,
+                    web_results=request.web_results,
+                    fetch_web_pages=request.fetch_web_pages,
+                    save_web_evidence=False,
+                )
+            )
+            return ChatMessageResponse(
+                message_id=new_id("msg"),
+                answer=research.answer,
+                citations=research.citations,
+                trace=ChatTrace(
+                    retrieval_mode=request.retrieval_mode,
+                    used_nanobot=True,
+                    model=get_settings().llm_model or "fallback-local",
+                    metadata={
+                        "session_id": session_id,
+                        "reasoning_mode": reasoning_mode.value,
+                        "nanobot_trace": research.trace,
+                        "plan": research.plan,
+                        "web_sources": [
+                            {
+                                "title": source.title,
+                                "url": source.url,
+                                "provider": source.provider,
+                                "snippet": source.snippet[:240],
+                            }
+                            for source in research.web_sources[:8]
+                        ],
+                        "web_source_count": len(research.web_sources),
+                        "evidence_anchor_count": len(research.evidence_anchors),
+                    },
+                ),
+            )
+
+        if reasoning_mode == ChatReasoningMode.DEEP:
+            reasoning = await reasoning_service.reason(
+                ReasoningRequest(
+                    question=request.message,
+                    retrieval_mode=request.retrieval_mode,
+                    top_k=request.top_k,
+                    max_sub_questions=request.max_reasoning_steps,
+                    scope=session_scope,
+                )
+            )
+            return ChatMessageResponse(
+                message_id=new_id("msg"),
+                answer=reasoning.answer,
+                citations=reasoning.citations,
+                trace=ChatTrace(
+                    retrieval_mode=request.retrieval_mode,
+                    used_nanobot=True,
+                    model=get_settings().llm_model or "fallback-local",
+                    metadata={
+                        "session_id": session_id,
+                        "reasoning_mode": reasoning_mode.value,
+                        "reasoning_trace": reasoning.trace,
+                        "sub_questions": reasoning.sub_questions,
+                    },
+                ),
+            )
+
         rows = await retrieval_service.retrieve_chunks_for_question(
             request.message,
             request.top_k,
@@ -52,8 +130,6 @@ class ChatService:
             answer = "I could not find relevant content in the current knowledge base. Add or broaden knowledge first, then ask again."
         else:
             answer = await self._answer_with_context(request.message, rows)
-            if request.use_nanobot_reasoning:
-                answer += "\n\nNote: Nanobot cross-document reasoning is reserved; this response used the normal RAG path."
         return ChatMessageResponse(
             message_id=new_id("msg"),
             answer=answer,
@@ -62,9 +138,22 @@ class ChatService:
                 retrieval_mode=request.retrieval_mode,
                 used_nanobot=False,
                 model=get_settings().llm_model or "fallback-local",
-                metadata={"session_id": session_id, "retrieved_chunks": len(rows)},
+                metadata={
+                    "session_id": session_id,
+                    "reasoning_mode": reasoning_mode.value,
+                    "retrieved_chunks": len(rows),
+                },
             ),
         )
+
+    def _resolve_reasoning_mode(self, request: ChatMessageRequest) -> ChatReasoningMode:
+        if request.reasoning_mode != ChatReasoningMode.NORMAL:
+            return request.reasoning_mode
+        if request.use_web_research:
+            return ChatReasoningMode.WEB
+        if request.use_nanobot_reasoning:
+            return ChatReasoningMode.DEEP
+        return ChatReasoningMode.NORMAL
 
     async def _answer_with_context(self, question: str, rows: list[dict]) -> str:
         context_parts = []
