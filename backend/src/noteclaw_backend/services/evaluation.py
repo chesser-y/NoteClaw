@@ -25,7 +25,9 @@ class EvaluationService:
             raise HTTPException(status_code=400, detail="Provide evaluation items or add demo_questions.json.")
 
         results: list[EvaluationItemResult] = []
+        hit_values: list[float] = []
         recall_values: list[float] = []
+        precision_values: list[float] = []
         reciprocal_rank_values: list[float] = []
         answer_overlap_values: list[float] = []
 
@@ -41,11 +43,17 @@ class EvaluationService:
             retrieved_note_ids = self._dedupe([row["note_id"] for row in rows])
             retrieved_chunk_ids = self._dedupe([row.get("chunk_id") for row in rows if row.get("chunk_id")])
 
-            has_expected_refs = bool(item.expected_note_ids or item.expected_chunk_ids)
-            recall_at_k = self._recall_at_k(item, rows) if has_expected_refs else 0.0
+            expected_refs = self._expected_refs(item)
+            matched_refs = self._matched_refs(item, rows)
+            has_expected_refs = bool(expected_refs)
+            hit_at_k = 1.0 if matched_refs else 0.0
+            recall_at_k = round(len(matched_refs) / len(expected_refs), 4) if has_expected_refs else 0.0
+            precision_at_k = self._precision_at_k(item, rows) if has_expected_refs else 0.0
             reciprocal_rank = self._reciprocal_rank(item, rows) if has_expected_refs else 0.0
             if has_expected_refs:
+                hit_values.append(hit_at_k)
                 recall_values.append(recall_at_k)
+                precision_values.append(precision_at_k)
                 reciprocal_rank_values.append(reciprocal_rank)
 
             answer_overlap = None
@@ -61,7 +69,11 @@ class EvaluationService:
                     citations=[self._to_citation(row) for row in rows],
                     retrieved_note_ids=retrieved_note_ids,
                     retrieved_chunk_ids=retrieved_chunk_ids,
+                    expected_ref_count=len(expected_refs),
+                    matched_ref_count=len(matched_refs),
+                    hit_at_k=hit_at_k,
                     recall_at_k=recall_at_k,
+                    precision_at_k=precision_at_k,
                     reciprocal_rank=reciprocal_rank,
                     answer_overlap=answer_overlap,
                     latency_ms=latency_ms,
@@ -69,7 +81,9 @@ class EvaluationService:
             )
 
         metrics = {
+            "hit_rate_at_k": self._avg(hit_values),
             "recall_at_k": self._avg(recall_values),
+            "precision_at_k": self._avg(precision_values),
             "mrr": self._avg(reciprocal_rank_values),
             "answer_overlap": self._avg(answer_overlap_values),
             "avg_latency_ms": self._avg([item.latency_ms for item in results]),
@@ -122,27 +136,84 @@ class EvaluationService:
                     expected_answer=raw.get("expected_answer") or raw.get("expected_answer_hint"),
                     expected_note_ids=list(raw.get("expected_note_ids") or []),
                     expected_chunk_ids=list(raw.get("expected_chunk_ids") or []),
+                    expected_sources=list(raw.get("expected_sources") or raw.get("recommended_files") or []),
+                    recommended_files=list(raw.get("recommended_files") or []),
                 )
             )
         return items
 
-    def _recall_at_k(self, item: EvaluationDatasetItem, rows: list[dict]) -> float:
-        expected_chunks = set(item.expected_chunk_ids)
-        expected_notes = set(item.expected_note_ids)
-        expected_total = len(expected_chunks) + len(expected_notes)
-        if expected_total == 0:
+    def _expected_refs(self, item: EvaluationDatasetItem) -> set[str]:
+        refs = {f"chunk:{chunk_id}" for chunk_id in item.expected_chunk_ids if chunk_id}
+        refs.update(f"note:{note_id}" for note_id in item.expected_note_ids if note_id)
+        refs.update(f"source:{self._normalize_source(source)}" for source in self._expected_sources(item))
+        return {ref for ref in refs if not ref.endswith(":")}
+
+    def _expected_sources(self, item: EvaluationDatasetItem) -> list[str]:
+        return [source for source in [*item.expected_sources, *item.recommended_files] if source]
+
+    def _matched_refs(self, item: EvaluationDatasetItem, rows: list[dict]) -> set[str]:
+        expected_refs = self._expected_refs(item)
+        matched: set[str] = set()
+        for row in rows:
+            for ref in self._row_refs(row, item):
+                if ref in expected_refs:
+                    matched.add(ref)
+        return matched
+
+    def _precision_at_k(self, item: EvaluationDatasetItem, rows: list[dict]) -> float:
+        if not rows:
             return 0.0
-        hit_chunks = {row.get("chunk_id") for row in rows if row.get("chunk_id") in expected_chunks}
-        hit_notes = {row["note_id"] for row in rows if row["note_id"] in expected_notes}
-        return round((len(hit_chunks) + len(hit_notes)) / expected_total, 4)
+        relevant_rows = sum(1 for row in rows if self._row_matches_expected(row, item))
+        return round(relevant_rows / len(rows), 4)
 
     def _reciprocal_rank(self, item: EvaluationDatasetItem, rows: list[dict]) -> float:
-        expected_chunks = set(item.expected_chunk_ids)
-        expected_notes = set(item.expected_note_ids)
         for rank, row in enumerate(rows, start=1):
-            if row.get("chunk_id") in expected_chunks or row["note_id"] in expected_notes:
+            if self._row_matches_expected(row, item):
                 return round(1.0 / rank, 4)
         return 0.0
+
+    def _row_matches_expected(self, row: dict, item: EvaluationDatasetItem) -> bool:
+        expected_refs = self._expected_refs(item)
+        return any(ref in expected_refs for ref in self._row_refs(row, item))
+
+    def _row_refs(self, row: dict, item: EvaluationDatasetItem) -> set[str]:
+        refs: set[str] = set()
+        chunk_id = row.get("chunk_id")
+        note_id = row.get("note_id")
+        if chunk_id:
+            refs.add(f"chunk:{chunk_id}")
+        if note_id:
+            refs.add(f"note:{note_id}")
+
+        source = str(row.get("source") or "")
+        title = str(row.get("title") or "")
+        normalized_source = self._normalize_source(source)
+        if normalized_source:
+            refs.add(f"source:{normalized_source}")
+        for expected_source in self._expected_sources(item):
+            normalized_expected = self._normalize_source(expected_source)
+            if not normalized_expected:
+                continue
+            if self._source_matches(normalized_source, normalized_expected) or self._source_matches(
+                self._normalize_source(title), normalized_expected
+            ):
+                refs.add(f"source:{normalized_expected}")
+        return refs
+
+    def _source_matches(self, candidate: str, expected: str) -> bool:
+        if not candidate or not expected:
+            return False
+        if candidate == expected or candidate.endswith(expected) or expected.endswith(candidate):
+            return True
+        candidate_name = candidate.rsplit("/", 1)[-1]
+        expected_name = expected.rsplit("/", 1)[-1]
+        return bool(candidate_name and expected_name and candidate_name == expected_name)
+
+    def _normalize_source(self, source: str) -> str:
+        source = source.replace("\\", "/").strip().lower()
+        source = re.sub(r"^.*?/data/demo_subset/", "", source)
+        source = re.sub(r"^data/demo_subset/", "", source)
+        return source.strip(" /")
 
     def _answer_overlap(self, answer: str, expected: str) -> float:
         answer_terms = set(self._terms(answer))

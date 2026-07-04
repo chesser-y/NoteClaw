@@ -12,6 +12,8 @@ class EvaluationDatasetItem(BaseModel):
     expected_answer: str | None = None
     expected_note_ids: list[str] = Field(default_factory=list)
     expected_chunk_ids: list[str] = Field(default_factory=list)
+    expected_sources: list[str] = Field(default_factory=list)
+    recommended_files: list[str] = Field(default_factory=list)
 
 
 class EvaluationRunRequest(BaseModel):
@@ -29,7 +31,11 @@ class EvaluationItemResult(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     retrieved_note_ids: list[str] = Field(default_factory=list)
     retrieved_chunk_ids: list[str] = Field(default_factory=list)
+    expected_ref_count: int = 0
+    matched_ref_count: int = 0
+    hit_at_k: float
     recall_at_k: float
+    precision_at_k: float
     reciprocal_rank: float
     answer_overlap: float | None = None
     latency_ms: float

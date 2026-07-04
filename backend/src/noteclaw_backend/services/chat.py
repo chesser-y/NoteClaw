@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from noteclaw_backend.domain.enums import ChatReasoningMode
+from noteclaw_backend.schemas.agents import AgentWorkflowRequest
 from noteclaw_backend.schemas.chat import (
     ChatMessageRequest,
     ChatMessageResponse,
@@ -11,6 +12,7 @@ from noteclaw_backend.schemas.chat import (
 from noteclaw_backend.schemas.common import Citation, Scope, new_id, utc_now
 from noteclaw_backend.schemas.nanobot import NanobotResearchRequest
 from noteclaw_backend.schemas.reasoning import ReasoningRequest
+from noteclaw_backend.services.multi_agent import multi_agent_workflow_service
 from noteclaw_backend.services.providers import get_llm_provider
 from noteclaw_backend.services.nanobot_research import nanobot_research_service
 from noteclaw_backend.services.reasoning import reasoning_service
@@ -39,6 +41,47 @@ class ChatService:
         session_scope = self._session_scopes.get(session_id, Scope())
         scope = session_scope.model_dump()
         reasoning_mode = self._resolve_reasoning_mode(request)
+
+        if reasoning_mode == ChatReasoningMode.AGENT:
+            workflow = await multi_agent_workflow_service.run(
+                AgentWorkflowRequest(
+                    goal=request.message,
+                    retrieval_mode=request.retrieval_mode,
+                    scope=session_scope,
+                    top_k=min(request.top_k, 20),
+                    max_steps=request.max_reasoning_steps,
+                    use_web=request.use_web_research,
+                    web_results=request.web_results,
+                    fetch_web_pages=request.fetch_web_pages,
+                    output_format="answer",
+                    create_work_item=True,
+                    create_timeline_item=True,
+                )
+            )
+            return ChatMessageResponse(
+                message_id=new_id("msg"),
+                answer=workflow.final_answer,
+                citations=workflow.citations,
+                trace=ChatTrace(
+                    retrieval_mode=request.retrieval_mode,
+                    used_nanobot=True,
+                    model=get_settings().llm_model or "fallback-local",
+                    metadata={
+                        "session_id": session_id,
+                        "reasoning_mode": reasoning_mode.value,
+                        "workflow_id": workflow.workflow_id,
+                        "task_id": workflow.task_id,
+                        "work_item_id": workflow.work_item_id,
+                        "timeline_item_id": workflow.timeline_item_id,
+                        "plan": workflow.plan,
+                        "steps": [step.model_dump(mode="json") for step in workflow.steps],
+                        "review": workflow.review.model_dump(mode="json"),
+                        "use_web": workflow.trace.get("use_web", False),
+                        "web_source_count": len(workflow.web_sources),
+                        "evidence_anchor_count": len(workflow.evidence_anchors),
+                    },
+                ),
+            )
 
         if reasoning_mode == ChatReasoningMode.WEB:
             research = await nanobot_research_service.research(

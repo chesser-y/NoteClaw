@@ -31,6 +31,14 @@ class ChatReasoningMode(StrEnum):
     NORMAL = "normal"
     DEEP = "deep"
     WEB = "web"
+    AGENT = "agent"
+
+
+class AgentRole(StrEnum):
+    COORDINATOR = "coordinator"
+    RESEARCHER = "researcher"
+    REASONER = "reasoner"
+    REVIEWER = "reviewer"
 
 
 class TaskStatus(StrEnum):
@@ -80,3 +88,4 @@ class TaskType(StrEnum):
     VISION_ENRICHMENT = "vision_enrichment"
     GENERATION = "generation"
     HARNESS = "harness"
+    AGENT_WORKFLOW = "agent_workflow"
