@@ -1,60 +1,92 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
-import PageHeader from '../components/PageHeader.vue'
-import EmptyState from '../components/EmptyState.vue'
-import TaskBadge from '../components/TaskBadge.vue'
+import { getTask } from '../api/tasks'
 import { useTaskStore } from '../stores/tasks'
+import type { TaskRead } from '../api/types'
+import TaskCard from '../components/tasks/TaskCard.vue'
+import TaskDetailDrawer from '../components/tasks/TaskDetailDrawer.vue'
 
+const route = useRoute()
 const taskStore = useTaskStore()
+const selected = ref<TaskRead | null>(null)
+const loadingDetail = ref(false)
 
-onMounted(() => {
-  taskStore.refresh()
-})
+const inProgress = computed(() => taskStore.tasks.filter((t) => t.status === 'running' || t.status === 'queued'))
+const done = computed(() => taskStore.tasks.filter((t) => t.status === 'succeeded' || t.status === 'failed' || t.status === 'cancelled'))
+
+async function openTask(task: TaskRead) {
+  selected.value = task
+  loadingDetail.value = true
+  try {
+    const fresh = await getTask(task.id)
+    if (selected.value?.id === task.id) selected.value = fresh
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loadingDetail.value = false
+  }
+}
+
+async function refresh() {
+  await taskStore.refresh()
+  const queryTask = route.query.task as string | undefined
+  if (queryTask) {
+    const match = taskStore.tasks.find((t) => t.id === queryTask)
+    if (match) await openTask(match)
+  }
+}
+
+onMounted(refresh)
 </script>
 
 <template>
   <section class="content-wrap">
-    <PageHeader
-      eyebrow="Tasks"
-      title="任务中心"
-      description="入库、OCR、多模态理解、PPTX、生图、nanobot 检索等耗时流程都会以 task 的形式追踪。"
-    />
-
-    <div class="mb-5 flex justify-end">
-      <button class="btn" type="button" @click="taskStore.refresh">
-        <RefreshCw :size="16" />
-        刷新任务
+    <header class="mb-5 flex items-end justify-between">
+      <div>
+        <h1 class="section-title">Tasks</h1>
+        <p class="muted mt-1 text-sm">复杂任务的进度与结果 · nanobot 跨文档推理会出现在这里</p>
+      </div>
+      <button class="btn h-8" type="button" @click="refresh">
+        <RefreshCw :size="13" />
+        刷新
       </button>
-    </div>
+    </header>
 
-    <div v-if="taskStore.error" class="mb-6 border border-[#70433b] bg-[#261716] p-4 text-sm text-[#f0b8ad]">
+    <p v-if="taskStore.error" class="mb-5 rounded-lg border border-[#fcd9d4] bg-[#fef3f1] px-3 py-2 text-xs text-[#b42618]">
       {{ taskStore.error }}
+    </p>
+
+    <div v-if="inProgress.length" class="mb-7">
+      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">In progress</h2>
+      <div class="space-y-3">
+        <TaskCard
+          v-for="t in inProgress"
+          :key="t.id"
+          :task="t"
+          @click="openTask(t)"
+        />
+      </div>
     </div>
 
-    <div v-if="taskStore.tasks.length" class="space-y-3">
-      <article v-for="task in taskStore.tasks" :key="task.id" class="surface grid gap-4 p-5 md:grid-cols-[1fr_auto]">
-        <div>
-          <div class="mb-2 flex flex-wrap items-center gap-3">
-            <h3 class="text-lg text-white">{{ task.type }}</h3>
-            <TaskBadge :status="task.status" />
-          </div>
-          <p class="mb-3 text-sm text-[#9aa3a0]">{{ task.message || '等待任务消息' }}</p>
-          <div class="h-2 w-full bg-[#202525]">
-            <div class="h-full bg-[#d9d2bf]" :style="{ width: `${Math.round(task.progress * 100)}%` }"></div>
-          </div>
-        </div>
-        <div class="text-right text-sm text-[#8f9996]">
-          <div>{{ task.id }}</div>
-          <div class="mt-2">{{ Math.round(task.progress * 100) }}%</div>
-        </div>
-      </article>
+    <div v-if="done.length">
+      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Recent</h2>
+      <div class="space-y-3">
+        <TaskCard
+          v-for="t in done"
+          :key="t.id"
+          :task="t"
+          @click="openTask(t)"
+        />
+      </div>
     </div>
 
-    <EmptyState
-      v-else
-      title="暂无任务"
-      description="创建入库、生成或 nanobot 搜集任务后，这里会展示任务进度和结果。"
-    />
+    <div v-if="!taskStore.tasks.length && !taskStore.loading" class="surface flex flex-col items-center gap-2 px-4 py-12 text-center">
+      <div class="text-sm text-[#111827]">暂无任务</div>
+      <p class="text-xs text-[#9ca3af]">在创作台生成 PPT、拖入 PDF，或用 ⌘K 触发 nanobot 任务。</p>
+    </div>
+
+    <TaskDetailDrawer :task="selected" :loading="loadingDetail" @close="selected = null" />
   </section>
 </template>

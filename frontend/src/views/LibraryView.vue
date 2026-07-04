@@ -1,32 +1,52 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { RefreshCw, Search } from 'lucide-vue-next'
-import PageHeader from '../components/PageHeader.vue'
-import EmptyState from '../components/EmptyState.vue'
+import { computed, onMounted, ref } from 'vue'
+import { Search, SlidersHorizontal, MessageSquareText, RefreshCw } from 'lucide-vue-next'
 import { listKnowledge } from '../api/knowledge'
 import { searchKnowledge } from '../api/search'
 import type { ContentType, NoteListItem, SearchResult } from '../api/types'
+import { useUiStore } from '../stores/ui'
+import NoteCard from '../components/library/NoteCard.vue'
 
+const ui = useUiStore()
+
+type Filter = 'recent' | 'all' | 'document' | 'image' | 'code' | 'starred'
+const filters: { id: Filter; label: string }[] = [
+  { id: 'recent', label: '最近使用' },
+  { id: 'all', label: '全部' },
+  { id: 'document', label: '文档' },
+  { id: 'image', label: '图片' },
+  { id: 'code', label: '代码' },
+  { id: 'starred', label: '收藏' },
+]
+
+const activeFilter = ref<Filter>('all')
+const query = ref('')
 const loading = ref(false)
 const error = ref('')
-const query = ref('')
-const contentType = ref<ContentType | ''>('')
 const notes = ref<NoteListItem[]>([])
-const searchResults = ref<SearchResult[]>([])
+const searchResults = ref<SearchResult[] | null>(null)
+const showAdvanced = ref(false)
+
+const contentTypeForFilter = computed<ContentType | ''>(() => {
+  if (activeFilter.value === 'document') return 'document'
+  if (activeFilter.value === 'image') return 'image'
+  if (activeFilter.value === 'code') return 'code'
+  return ''
+})
 
 async function loadNotes() {
   loading.value = true
   error.value = ''
   try {
+    searchResults.value = null
     const response = await listKnowledge({
       q: query.value || undefined,
-      content_type: contentType.value,
-      limit: 20,
-      offset: 0,
+      content_type: contentTypeForFilter.value,
+      limit: 24,
     })
     notes.value = response.items
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
   }
@@ -34,11 +54,9 @@ async function loadNotes() {
 
 async function runSearch() {
   if (!query.value.trim()) {
-    searchResults.value = []
     await loadNotes()
     return
   }
-
   loading.value = true
   error.value = ''
   try {
@@ -46,20 +64,24 @@ async function runSearch() {
       query: query.value,
       mode: 'hybrid',
       filters: {
-        content_types: contentType.value ? [contentType.value] : [],
+        content_types: contentTypeForFilter.value ? [contentTypeForFilter.value] : [],
         tags: [],
         category: null,
         date_from: null,
         date_to: null,
       },
-      limit: 10,
+      limit: 12,
     })
     searchResults.value = response.results
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
   }
+}
+
+function onAsk() {
+  ui.openAsk(null, query.value.trim() || undefined)
 }
 
 onMounted(loadNotes)
@@ -67,79 +89,104 @@ onMounted(loadNotes)
 
 <template>
   <section class="content-wrap">
-    <PageHeader
-      eyebrow="Library"
-      title="知识库"
-      description="查看已经沉淀的原文、摘要、标签和来源。搜索框会走后端 hybrid 检索接口，返回引用 chunk。"
-    />
-
-    <div class="surface-soft mb-6 grid gap-3 p-4 md:grid-cols-[1fr_180px_auto_auto]">
-      <div class="flex items-center gap-2 border border-[#343a38] bg-[#121414] px-3">
-        <Search :size="18" class="text-[#8f9996]" />
-        <input v-model="query" class="field border-0 bg-transparent px-0" placeholder="搜索知识库内容" />
+    <header class="mb-5 flex items-end justify-between">
+      <div>
+        <h1 class="section-title">Library</h1>
+        <p class="muted mt-1 text-sm">管理沉淀下来的资料 · 搜索会调用 hybrid 检索</p>
       </div>
-      <select v-model="contentType" class="field">
-        <option value="">全部类型</option>
-        <option value="text">文本</option>
-        <option value="code">代码</option>
-        <option value="table">表格</option>
-        <option value="image">图片</option>
-        <option value="document">文档</option>
-      </select>
-      <button class="btn btn-primary" type="button" @click="runSearch">检索</button>
-      <button class="btn" type="button" @click="loadNotes">
-        <RefreshCw :size="16" />
+      <button class="btn h-8" type="button" @click="loadNotes">
+        <RefreshCw :size="13" />
         刷新
+      </button>
+    </header>
+
+    <div class="surface mb-5 flex items-center gap-2 px-3 py-2">
+      <Search :size="15" class="text-[#9ca3af]" />
+      <input
+        v-model="query"
+        class="min-w-0 flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
+        placeholder="Search anything in your notes..."
+        @keydown.enter="runSearch"
+      />
+      <button class="btn btn-ghost h-7 px-2 text-xs" type="button" @click="showAdvanced = !showAdvanced">
+        <SlidersHorizontal :size="12" />
+        高级
+      </button>
+      <button class="btn btn-ghost h-7 px-2 text-xs" type="button" @click="onAsk">
+        <MessageSquareText :size="12" />
+        提问
       </button>
     </div>
 
-    <div v-if="error" class="mb-6 border border-[#70433b] bg-[#261716] p-4 text-sm text-[#f0b8ad]">
-      {{ error }}
-    </div>
-
-    <div v-if="searchResults.length" class="mb-8">
-      <h2 class="mb-4 text-lg text-white">检索结果</h2>
-      <div class="grid-auto">
-        <article v-for="result in searchResults" :key="`${result.note_id}-${result.chunk_id}`" class="surface p-5">
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <h3 class="text-lg text-white">{{ result.title }}</h3>
-            <span class="chip">{{ result.content_type }}</span>
-          </div>
-          <p class="mb-4 text-sm leading-6 text-[#a9b1ae]">{{ result.snippet }}</p>
-          <div class="flex flex-wrap gap-2">
-            <span v-for="tag in result.tags" :key="tag" class="chip">{{ tag }}</span>
-            <span v-if="result.score !== null && result.score !== undefined" class="chip">
-              score {{ result.score.toFixed(2) }}
-            </span>
-          </div>
-        </article>
+    <div v-if="showAdvanced" class="surface mb-5 grid gap-3 p-4 md:grid-cols-3">
+      <div>
+        <label class="mb-1 block text-xs text-[#6b7280]">标签</label>
+        <input class="field h-9" placeholder="#tag1, #tag2" />
+      </div>
+      <div>
+        <label class="mb-1 block text-xs text-[#6b7280]">分类</label>
+        <input class="field h-9" placeholder="research / engineering / ..." />
+      </div>
+      <div>
+        <label class="mb-1 block text-xs text-[#6b7280]">日期范围</label>
+        <div class="flex items-center gap-2">
+          <input type="date" class="field h-9" />
+          <span class="text-xs text-[#9ca3af]">—</span>
+          <input type="date" class="field h-9" />
+        </div>
       </div>
     </div>
 
-    <div v-if="notes.length" class="grid-auto">
-      <article v-for="note in notes" :key="note.id" class="surface p-5">
-        <div class="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h3 class="text-lg text-white">{{ note.title }}</h3>
-            <div class="mt-1 text-xs uppercase tracking-[0.14em] text-[#7d8784]">
-              {{ note.content_type }} / {{ note.status }}
-            </div>
-          </div>
-          <span class="chip">{{ note.source ?? 'local' }}</span>
-        </div>
-        <p class="mb-5 min-h-[72px] text-sm leading-6 text-[#a9b1ae]">
-          {{ note.summary || '等待摘要生成' }}
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <span v-for="tag in note.tags" :key="tag" class="chip">{{ tag }}</span>
-        </div>
-      </article>
+    <div class="mb-6 flex flex-wrap items-center gap-1.5">
+      <button
+        v-for="f in filters"
+        :key="f.id"
+        type="button"
+        class="rounded-full px-3 py-1.5 text-xs font-medium transition"
+        :class="activeFilter === f.id ? 'bg-[#4f46e5] text-white' : 'bg-white text-[#6b7280] hover:bg-[#f3f4f6]'"
+        @click="activeFilter = f.id; loadNotes()"
+      >
+        {{ f.label }}
+      </button>
     </div>
 
-    <EmptyState
-      v-else-if="!loading"
-      title="还没有知识卡片"
-      description="先去信息输入页添加文本、代码、表格或图片，后端会生成摘要、标签并写入知识库。"
-    />
+    <p v-if="error" class="mb-5 rounded-lg border border-[#fcd9d4] bg-[#fef3f1] px-3 py-2 text-xs text-[#b42618]">
+      {{ error }}
+    </p>
+
+    <div v-if="searchResults" class="space-y-4">
+      <div class="text-xs text-[#6b7280]">检索结果 · {{ searchResults.length }} 条</div>
+      <div class="grid gap-3 md:grid-cols-2">
+        <NoteCard
+          v-for="r in searchResults"
+          :key="`${r.note_id}-${r.chunk_id}`"
+          :title="r.title"
+          :content-type="r.content_type"
+          :summary="r.snippet"
+          :tags="r.tags"
+          :source="r.source ?? undefined"
+          :score="r.score ?? undefined"
+        />
+      </div>
+    </div>
+
+    <div v-else-if="notes.length" class="grid gap-3 md:grid-cols-2">
+      <NoteCard
+        v-for="note in notes"
+        :key="note.id"
+        :title="note.title"
+        :content-type="note.content_type"
+        :summary="note.summary ?? ''"
+        :tags="note.tags"
+        :source="note.source ?? undefined"
+        :created-at="note.created_at"
+      />
+    </div>
+
+    <div v-else-if="!loading" class="surface flex flex-col items-center gap-2 px-4 py-12 text-center">
+      <div class="text-sm text-[#111827]">还没有保存的资料</div>
+      <p class="text-xs text-[#9ca3af]">回到首页粘贴文本或拖入 PDF 即可开始沉淀知识库。</p>
+      <RouterLink to="/" class="btn btn-primary mt-2 h-8">返回首页</RouterLink>
+    </div>
   </section>
 </template>
