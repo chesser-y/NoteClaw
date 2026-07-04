@@ -28,6 +28,33 @@ class TaskService:
     def get_task(self, task_id: str) -> TaskRead | None:
         return self._tasks.get(task_id)
 
+    def update_task(
+        self,
+        task_id: str,
+        *,
+        status: TaskStatus | None = None,
+        progress: float | None = None,
+        message: str | None = None,
+        result: dict | None = None,
+        error: str | None = None,
+    ) -> TaskRead | None:
+        task = self._tasks.get(task_id)
+        if task is None:
+            return None
+
+        if status is not None:
+            task.status = status
+        if progress is not None:
+            task.progress = max(0.0, min(1.0, float(progress)))
+        if message is not None:
+            task.message = message
+        if result is not None:
+            task.result = result
+        if error is not None:
+            task.error = error
+        task.updated_at = utc_now()
+        return task
+
     def list_tasks(
         self,
         status: TaskStatus | None = None,

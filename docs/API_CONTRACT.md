@@ -8,6 +8,38 @@
 - ID 使用字符串，后端生成，通常带业务前缀，例如 `note_...`、`task_...`。
 - 当前后端实现是 contract-first stub，接口形状已经稳定，SQLite、FAISS、LLM、PPT、nanobot 的真实实现会在对应 service 层补齐。
 
+### 模型适配层说明（内部）
+
+NoteClaw 后端文本、embedding、视觉、图片生成能力暂由 `NoteClawOpenAICompat` 封装。
+
+- 基础配置：
+  - `OPENAI_COMPAT_BASE_URL`
+  - `OPENAI_COMPAT_API_KEY`
+  - `LLM_MODEL`
+  - `EMBEDDING_MODEL`
+  - `VISION_MODEL`
+  - `IMAGE_MODEL`
+- 按能力可选覆盖：
+  - `OPENAI_COMPAT_CHAT_API_KEY`
+  - `OPENAI_COMPAT_CHAT_BASE_URL`
+  - `OPENAI_COMPAT_CHAT_MODEL`
+  - `OPENAI_COMPAT_EMBEDDING_API_KEY`
+  - `OPENAI_COMPAT_EMBEDDING_BASE_URL`
+  - `OPENAI_COMPAT_EMBEDDING_MODEL`
+  - `OPENAI_COMPAT_VISION_API_KEY`
+  - `OPENAI_COMPAT_VISION_BASE_URL`
+  - `OPENAI_COMPAT_VISION_MODEL`
+  - `OPENAI_COMPAT_IMAGE_API_KEY`
+  - `OPENAI_COMPAT_IMAGE_BASE_URL`
+  - `OPENAI_COMPAT_IMAGE_MODEL`
+
+推荐默认模型：
+
+- 对话：`gpt-4o`
+- embedding：`text-embedding-3-small`
+- 视觉理解：`gpt-4o`
+- 图片生成：`gpt-image-1`
+
 ## 通用枚举
 
 ```ts
