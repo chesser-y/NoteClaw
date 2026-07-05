@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { Eye } from 'lucide-vue-next'
 import { listKnowledge } from '../api/knowledge'
 import type { ContentType, NoteListItem } from '../api/types'
+import FilterPopover from '../components/library/FilterPopover.vue'
+import NotePreview from '../components/preview/NotePreview.vue'
+
+const { t } = useI18n()
+const route = useRoute()
 
 const items = ref<NoteListItem[]>([])
 const total = ref(0)
@@ -9,6 +17,19 @@ const loading = ref(false)
 const q = ref('')
 const contentType = ref<ContentType | ''>('')
 const selected = ref<NoteListItem | null>(null)
+const previewId = ref<string | null>(null)
+
+function openPreview() {
+  if (selected.value) previewId.value = selected.value.id
+}
+function closePreview() {
+  previewId.value = null
+}
+
+const filterTags = ref<string[]>([])
+const filterSource = ref('')
+const filterDateFrom = ref('')
+const filterDateTo = ref('')
 
 const tabs: { label: string; value: ContentType | '' }[] = [
   { label: 'All', value: '' },
@@ -25,6 +46,10 @@ async function load() {
     const res = await listKnowledge({
       q: q.value || undefined,
       content_type: contentType.value,
+      tag: filterTags.value.length ? filterTags.value : undefined,
+      source: filterSource.value || undefined,
+      date_from: filterDateFrom.value || undefined,
+      date_to: filterDateTo.value || undefined,
       limit: 50,
     })
     items.value = res.items
@@ -34,7 +59,14 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  const tagQuery = route.query.tag
+  if (tagQuery) {
+    const tags = Array.isArray(tagQuery) ? tagQuery : [tagQuery]
+    filterTags.value = tags as string[]
+  }
+  load()
+})
 
 function onSearch() {
   load()
@@ -95,7 +127,7 @@ const filteredItems = computed(() => items.value)
         v-model="q"
         class="field"
         style="height: 32px; max-width: 320px; font-size: 13px;"
-        placeholder="Search anything in your notes..."
+        :placeholder="t('library.placeholder')"
         @keydown.enter="onSearch"
       />
       <div style="display: flex; gap: 2px;">
@@ -110,13 +142,24 @@ const filteredItems = computed(() => items.value)
         </button>
       </div>
       <span class="spacer"></span>
-      <span class="muted" style="font-size: 12px;">{{ total }} items</span>
+      <FilterPopover
+        :selected-tags="filterTags"
+        :source="filterSource"
+        :date-from="filterDateFrom"
+        :date-to="filterDateTo"
+        @update:selected-tags="(v) => { filterTags = v; load() }"
+        @update:source="(v) => { filterSource = v; load() }"
+        @update:date-from="(v) => { filterDateFrom = v; load() }"
+        @update:date-to="(v) => { filterDateTo = v; load() }"
+        @reset="load"
+      />
+      <span class="muted" style="font-size: 12px;">{{ t('library.total', { count: total }) }}</span>
     </header>
 
     <div class="issues-table" style="padding: 18px 28px; flex: 1; overflow-y: auto;">
       <div v-if="loading" class="placeholder">Loading...</div>
       <div v-else-if="!filteredItems.length" class="placeholder">
-        No notes yet. Paste content or drop a file in Inbox to get started.
+        {{ t('empty.library-empty') }}
       </div>
       <div v-else>
         <div
@@ -154,6 +197,9 @@ const filteredItems = computed(() => items.value)
         <header class="topbar">
           <span>{{ selected.title }}</span>
           <span class="spacer"></span>
+          <button class="btn btn-ghost" style="height: 28px; padding: 0 10px; font-size: 12px;" @click="openPreview">
+            <Eye :size="13" /> Preview
+          </button>
           <button class="icon-button" @click="selected = null">✕</button>
         </header>
         <div style="padding: 20px 24px; overflow-y: auto; flex: 1;">
@@ -193,6 +239,8 @@ const filteredItems = computed(() => items.value)
         </div>
       </div>
     </div>
+
+    <NotePreview :note-id="previewId" @close="closePreview" />
   </section>
 </template>
 

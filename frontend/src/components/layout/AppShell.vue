@@ -5,14 +5,17 @@ import {
   Telescope,
   Workflow,
   Clock,
-  Map as MapIcon,
   Sparkles,
   CheckCircle,
   Settings,
   Search,
   Plus,
+  Network,
+  Menu,
+  PanelLeftClose,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '../../stores/ui'
 import { useMagicKey } from '../../composables/useMagicKey'
 import AskPanel from '../ask/AskPanel.vue'
@@ -22,6 +25,8 @@ import WorkspaceMenu from './WorkspaceMenu.vue'
 
 const ui = useUiStore()
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 const mainItems = [
   { to: '/', label: 'nav.inbox', icon: Inbox },
@@ -32,7 +37,7 @@ const mainItems = [
 
 const workspaceItems = [
   { to: '/timeline', label: 'nav.timeline', icon: Clock },
-  { to: '/map', label: 'nav.map', icon: MapIcon },
+  { to: '/graph', label: 'nav.graph', icon: Network },
   { to: '/studio', label: 'nav.studio', icon: Sparkles },
   { to: '/review', label: 'nav.review', icon: CheckCircle },
 ]
@@ -43,35 +48,63 @@ useMagicKey((e) => {
     ui.togglePalette()
   }
 })
+
+function navTo(to: string) {
+  if (route.fullPath !== to) router.push(to)
+}
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': !ui.sidebarOpen }">
+    <button
+      v-if="!ui.sidebarOpen"
+      class="hamburger"
+      type="button"
+      :aria-label="t('nav.menu')"
+      :aria-expanded="ui.sidebarOpen"
+      @click="ui.toggleSidebar()"
+    >
+      <Menu :size="18" />
+    </button>
+
+    <div
+      v-if="ui.sidebarOpen"
+      class="sidebar-backdrop"
+      @click="ui.closeSidebar()"
+    ></div>
+
+    <aside class="sidebar" :class="{ open: ui.sidebarOpen }">
       <div class="brand">
         <WorkspaceMenu />
         <div class="brand-actions">
-          <button class="icon-button" type="button" aria-label="Search" @click="ui.openPalette()">
-            <Search :size="16" />
-          </button>
-          <RouterLink to="/" class="icon-button filled" aria-label="Compose">
+          <RouterLink to="/" class="icon-button filled" aria-label="Compose" :title="t('action.new-chat')">
             <Plus :size="16" />
           </RouterLink>
+          <button
+            class="icon-button collapse-btn"
+            type="button"
+            :aria-label="t('nav.menu')"
+            :title="t('nav.menu')"
+            @click="ui.closeSidebar()"
+          >
+            <PanelLeftClose :size="16" />
+          </button>
         </div>
       </div>
 
       <nav>
         <div class="nav-section">
           <div class="nav-list">
-            <RouterLink
+            <a
               v-for="item in mainItems"
               :key="item.to"
-              :to="item.to"
               class="nav-link"
+              :class="{ active: route.path === item.to }"
+              @click="navTo(item.to)"
             >
               <component :is="item.icon" :size="16" />
               <span>{{ t(item.label) }}</span>
-            </RouterLink>
+            </a>
           </div>
         </div>
 
@@ -83,15 +116,16 @@ useMagicKey((e) => {
             </svg>
           </div>
           <div class="nav-list">
-            <RouterLink
+            <a
               v-for="item in workspaceItems"
               :key="item.to"
-              :to="item.to"
               class="nav-link"
+              :class="{ active: route.path === item.to }"
+              @click="navTo(item.to)"
             >
               <component :is="item.icon" :size="16" />
               <span>{{ t(item.label) }}</span>
-            </RouterLink>
+            </a>
           </div>
         </div>
 
@@ -104,7 +138,7 @@ useMagicKey((e) => {
           </div>
           <div class="nav-list">
             <div class="nav-link muted-static">
-              <span class="status-ring gray" style="width: 14px; height: 14px; border-width: 2px;"></span>
+              <span class="status-ring gray"></span>
               <span style="color: #7b8089; font-size: 13px;">Star topics to pin</span>
             </div>
           </div>
@@ -112,10 +146,14 @@ useMagicKey((e) => {
 
         <div class="nav-section" style="margin-top: auto;">
           <div class="nav-list">
-            <RouterLink to="/settings" class="nav-link">
+            <a
+              class="nav-link"
+              :class="{ active: route.path === '/settings' }"
+              @click="navTo('/settings')"
+            >
               <Settings :size="16" />
               <span>{{ t('nav.settings') }}</span>
-            </RouterLink>
+            </a>
             <div class="nav-link theme-row" style="cursor: default;">
               <span style="flex: 1;"></span>
               <ThemeToggle />
@@ -128,6 +166,18 @@ useMagicKey((e) => {
     <main class="main-panel">
       <RouterView />
     </main>
+
+    <div class="topbar-actions">
+      <button
+        class="icon-button topbar-action"
+        type="button"
+        :aria-label="t('action.open-palette')"
+        :title="t('action.open-palette')"
+        @click="ui.openPalette()"
+      >
+        <Search :size="16" />
+      </button>
+    </div>
 
     <AskPanel />
     <CommandPalette />
@@ -149,5 +199,92 @@ useMagicKey((e) => {
 }
 .theme-row:hover {
   background: transparent;
+}
+
+.hamburger {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 60;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.hamburger:hover {
+  background: var(--panel-3);
+}
+
+.topbar-actions {
+  position: fixed;
+  top: 10px;
+  right: 14px;
+  z-index: 30;
+  display: inline-flex;
+  gap: 6px;
+}
+.topbar-action {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+}
+.topbar-action:hover {
+  background: var(--panel-3);
+}
+
+.collapse-btn {
+  display: inline-flex;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+.sidebar {
+  transform: translateX(0);
+  transition: transform 200ms ease;
+}
+
+.sidebar:not(.open) {
+  transform: translateX(-100%);
+}
+
+@media (max-width: 920px) {
+  .collapse-btn {
+    display: none;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    backdrop-filter: blur(2px);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
 }
 </style>

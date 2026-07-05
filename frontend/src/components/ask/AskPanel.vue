@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MessageSquareText, Send } from 'lucide-vue-next'
 import { useUiStore } from '../../stores/ui'
 import { createChatSession, sendChatMessage } from '../../api/chat'
@@ -8,6 +8,18 @@ import SourceList from '../common/SourceList.vue'
 import Drawer from '../common/Drawer.vue'
 
 const ui = useUiStore()
+
+const isDesktop = ref(true)
+let mql: MediaQueryList | null = null
+const updateMedia = () => {
+  isDesktop.value = mql?.matches ?? true
+}
+onMounted(() => {
+  mql = window.matchMedia('(min-width: 921px)')
+  mql.addEventListener('change', updateMedia)
+  updateMedia()
+})
+onUnmounted(() => mql?.removeEventListener('change', updateMedia))
 
 const input = ref(ui.askPrefill || '')
 const sending = ref(false)
@@ -58,7 +70,7 @@ async function submit() {
 </script>
 
 <template>
-  <Drawer :open="ui.askOpen" title="Ask NoteClaw" width="480px" @close="ui.closeAsk()">
+  <Drawer v-if="isDesktop" :open="ui.askOpen" title="Ask NoteClaw" width="480px" @close="ui.closeAsk()">
     <div class="space-y-4">
       <p class="text-sm text-[#929399]">
         你可以问<span class="font-medium text-[#626be6]">{{ scopeLabel }}</span>，也可以问全部资料。

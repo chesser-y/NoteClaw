@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ingestContent, ingestFile } from '../api/ingest'
 import type { ContentType, IngestResponse } from '../api/types'
 
@@ -15,6 +15,18 @@ export type PreviewState = {
   tags: string[]
   related: { id: string; title: string; type: ContentType }[]
   source: string
+}
+
+export type BatchItem = {
+  file: File
+  status: 'queued' | 'uploading' | 'done' | 'failed'
+  error?: string
+  response?: IngestResponse
+}
+
+export type BatchState = {
+  items: BatchItem[]
+  running: boolean
 }
 
 function detectCodeLanguage(text: string): string | undefined {
@@ -68,6 +80,52 @@ export function useIngest() {
   const saving = ref(false)
   const lastResponse = ref<IngestResponse | null>(null)
   const error = ref('')
+
+  const batch = ref<BatchState>({ items: [], running: false })
+
+  const batchProgress = computed(() => {
+    const total = batch.value.items.length
+    const done = batch.value.items.filter((i) => i.status === 'done' || i.status === 'failed').length
+    return { total, done, pct: total ? Math.round((done / total) * 100) : 0 }
+  })
+
+  function fileContentTypeLocal(file: File): ContentType {
+    return fileContentType(file)
+  }
+
+  async function uploadFiles(files: File[] | FileList, sourcePrefix = 'upload') {
+    const list = Array.from(files)
+    if (!list.length) return
+    batch.value = {
+      items: list.map((file) => ({ file, status: 'queued' as const })),
+      running: true,
+    }
+    const concurrency = 4
+    const queue = [...batch.value.items]
+    async function worker() {
+      while (queue.length) {
+        const item = queue.shift()!
+        item.status = 'uploading'
+        try {
+          const contentType = fileContentTypeLocal(item.file)
+          const source = item.file.webkitRelativePath
+            ? `${sourcePrefix}:${item.file.webkitRelativePath.split('/')[0]}`
+            : sourcePrefix
+          item.response = await ingestFile(item.file, contentType, source)
+          item.status = 'done'
+        } catch (e) {
+          item.error = e instanceof Error ? e.message : String(e)
+          item.status = 'failed'
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, list.length) }, worker))
+    batch.value.running = false
+  }
+
+  function clearBatch() {
+    batch.value = { items: [], running: false }
+  }
 
   function fromText(text: string): PreviewState | null {
     const detected = detectKind(text)
@@ -143,6 +201,10 @@ export function useIngest() {
     saving,
     error,
     lastResponse,
+    batch,
+    batchProgress,
+    uploadFiles,
+    clearBatch,
     fromText,
     fromFile,
     setPreview,

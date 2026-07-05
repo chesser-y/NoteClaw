@@ -27,6 +27,9 @@ class NoteRepository(Protocol):
     async def delete_note(self, note_id: str) -> None:
         ...
 
+    async def facets(self) -> dict[str, list[Any]]:
+        ...
+
 
 class ChunkRepository(Protocol):
     async def list_by_note(self, note_id: str) -> list[dict]:
@@ -220,6 +223,34 @@ class SQLiteKnowledgeRepository:
     async def delete_note(self, note_id: str) -> None:
         with self.store.connect() as conn:
             conn.execute("delete from notes where id = ?", (note_id,))
+
+    async def facets(self) -> dict[str, list[Any]]:
+        with self.store.connect() as conn:
+            tag_rows = conn.execute(
+                "select tags_json from notes where coalesce(tags_json, '') != ''"
+            ).fetchall()
+            sources = conn.execute(
+                "select distinct source from notes where source is not null and source != '' order by source"
+            ).fetchall()
+            categories = conn.execute(
+                "select distinct category from notes where category is not null and category != '' order by category"
+            ).fetchall()
+            content_types = conn.execute(
+                "select distinct content_type from notes order by content_type"
+            ).fetchall()
+        tag_counts: dict[str, int] = {}
+        for row in tag_rows:
+            for tag in _load(row["tags_json"], []):
+                if not isinstance(tag, str):
+                    continue
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        tags_sorted = sorted(tag_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        return {
+            "tags": tags_sorted,
+            "sources": [row["source"] for row in sources],
+            "categories": [row["category"] for row in categories],
+            "content_types": [row["content_type"] for row in content_types],
+        }
 
     async def add_feedback(
         self,

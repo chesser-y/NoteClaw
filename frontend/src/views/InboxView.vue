@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { FileText, Image as ImageIcon, Code2, Table as TableIcon, Send, MoreHorizontal } from "lucide-vue-next"
 import { useUiStore } from '../stores/ui'
 import { useChatStore } from '../stores/chat'
@@ -11,6 +12,9 @@ import type { NoteListItem, TaskRead } from '../api/types'
 import SourcePreview from '../components/home/SourcePreview.vue'
 import UnderstandingPanel from '../components/home/UnderstandingPanel.vue'
 import HomeHero from '../components/home/HomeHero.vue'
+import AgentTracePanel from '../components/chat/AgentTracePanel.vue'
+
+const { t } = useI18n()
 
 type Mode = 'hero' | 'split' | 'chat'
 
@@ -27,12 +31,12 @@ const loadingRecent = ref(false)
 const draftsQuestion = ref('')
 const tab = ref<'ask' | 'browse'>('ask')
 
-const prompts = [
-  '总结最近保存的资料',
-  '找出相关笔记',
-  '生成 PPT 大纲',
-  '对比这些方法',
-]
+const prompts = computed(() => [
+  t('inbox.suggestion-summarize'),
+  t('inbox.suggestion-related'),
+  t('inbox.suggestion-ppt'),
+  t('inbox.suggestion-compare'),
+])
 
 async function loadRecent() {
   loadingRecent.value = true
@@ -48,7 +52,14 @@ async function loadRecent() {
   }
 }
 
-onMounted(loadRecent)
+onMounted(() => {
+  loadRecent()
+  if (ui.askPrefill) {
+    const q = ui.askPrefill
+    ui.askPrefill = ''
+    submitQuestion(q)
+  }
+})
 
 async function submitQuestion(q?: string) {
   const text = (q ?? draftsQuestion.value).trim()
@@ -108,29 +119,29 @@ void hasConversation
 <template>
   <section class="inbox-view">
     <header class="topbar">
-      <span>Inbox</span>
+      <span>{{ t('inbox.title') }}</span>
       <button
         class="icon-button"
         type="button"
         :aria-pressed="mode !== 'hero'"
-        :title="mode === 'hero' ? '打开历史会话' : '返回首页'"
+        :title="mode === 'hero' ? t('inbox.open-history') : t('inbox.back-hero')"
         @click="mode === 'hero' ? (mode = 'split') : backToHero()"
       >
         <MoreHorizontal :size="16" />
       </button>
       <span class="spacer"></span>
       <div class="tabs" v-if="mode !== 'hero'">
-        <button class="tab" :class="{ active: tab === 'ask' }" @click="tab = 'ask'">Ask</button>
-        <button class="tab" :class="{ active: tab === 'browse' }" @click="tab = 'browse'">Browse</button>
-        <button class="tab" @click="focusChat">{{ mode === 'chat' ? 'Split' : 'Focus' }}</button>
-        <button class="tab" @click="backToHero">New</button>
+        <button class="tab" :class="{ active: tab === 'ask' }" @click="tab = 'ask'">{{ t('tabs.ask') }}</button>
+        <button class="tab" :class="{ active: tab === 'browse' }" @click="tab = 'browse'">{{ t('tabs.browse') }}</button>
+        <button class="tab" @click="focusChat">{{ mode === 'chat' ? t('tabs.split') : t('tabs.focus') }}</button>
+        <button class="tab" @click="backToHero">{{ t('tabs.new') }}</button>
       </div>
     </header>
 
     <!-- HERO MODE -->
     <div v-if="mode === 'hero'" class="inbox-hero">
-      <h1>Ask, drop, paste, or create…</h1>
-      <p class="hero-sub">把内容粘进来、拖入文件，或者直接问我。</p>
+      <h1>{{ t('inbox.hero-title') }}</h1>
+      <p class="hero-sub">{{ t('inbox.hero-sub') }}</p>
 
       <div v-if="ingest.preview.value" style="width: min(880px, 100%); display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
         <SourcePreview :preview="ingest.preview.value" />
@@ -162,7 +173,7 @@ void hasConversation
       <div class="inbox-list">
         <div class="inbox-items">
           <div class="section-title" style="font-size: 13px; padding: 6px 14px; color: #6f7480; font-weight: 700;">
-            Recent
+            {{ t('inbox.recent') }}
           </div>
           <div
             v-for="item in recent"
@@ -180,7 +191,7 @@ void hasConversation
           </div>
 
           <div v-if="tasks.length" class="section-title" style="font-size: 13px; padding: 14px 14px 6px; color: #6f7480; font-weight: 700;">
-            Recent tasks
+            {{ t('inbox.recent-tasks') }}
           </div>
           <div
             v-for="t in tasks"
@@ -198,7 +209,7 @@ void hasConversation
           </div>
 
           <div v-if="!recent.length && !tasks.length && !loadingRecent" class="placeholder" style="padding: 40px 16px; font-size: 13px;">
-            No recent items
+            {{ t('empty.inbox-recent') }}
           </div>
         </div>
       </div>
@@ -219,13 +230,17 @@ void hasConversation
           </div>
 
           <div v-if="!chat.turns.length && !ingest.preview.value" class="placeholder">
-            提一个问题开始对话
+            {{ t('inbox.empty-chat') }}
           </div>
 
           <div v-for="(turn, i) in chat.turns" :key="i" class="chat-msg" :class="turn.role">
             <div class="avatar">{{ turn.role === 'user' ? 'U' : 'NC' }}</div>
             <div style="flex: 1; min-width: 0;">
               <div class="bubble">{{ turn.content }}</div>
+              <AgentTracePanel
+                v-if="turn.role === 'assistant' && turn.trace?.steps?.length"
+                :trace="turn.trace"
+              />
               <div v-if="turn.citations && turn.citations.length" class="chat-citations">
                 <span
                   v-for="(c, idx) in turn.citations.slice(0, 5)"
@@ -241,14 +256,26 @@ void hasConversation
 
           <div v-if="chat.sending" class="chat-msg assistant">
             <div class="avatar">NC</div>
-            <div class="bubble muted">思考中…</div>
+            <div class="bubble muted">{{ chat.mode === 'agent' ? t('inbox.thinking-agent') : t('inbox.thinking-normal') }}</div>
           </div>
         </div>
 
         <div class="chat-input-bar">
+          <div class="mode-seg">
+            <button
+              type="button"
+              :class="{ active: chat.mode === 'normal' }"
+              @click="chat.setMode('normal')"
+            >Normal</button>
+            <button
+              type="button"
+              :class="{ active: chat.mode === 'agent' }"
+              @click="chat.setMode('agent')"
+            >Agent</button>
+          </div>
           <textarea
             v-model="draftsQuestion"
-            placeholder="问点什么… (⌘/Ctrl + Enter 发送)"
+            :placeholder="chat.mode === 'agent' ? t('inbox.ask-agent') : t('inbox.ask-normal')"
             @keydown.enter.meta.prevent="submitInline"
             @keydown.enter.ctrl.prevent="submitInline"
           ></textarea>
@@ -266,6 +293,10 @@ void hasConversation
           <div class="avatar">{{ turn.role === 'user' ? 'U' : 'NC' }}</div>
           <div style="flex: 1; min-width: 0;">
             <div class="bubble">{{ turn.content }}</div>
+            <AgentTracePanel
+              v-if="turn.role === 'assistant' && turn.trace?.steps?.length"
+              :trace="turn.trace"
+            />
             <div v-if="turn.citations && turn.citations.length" class="chat-citations">
               <span
                 v-for="(c, idx) in turn.citations.slice(0, 5)"
@@ -279,13 +310,25 @@ void hasConversation
           </div>
         </div>
 
-        <div v-if="!chat.turns.length" class="placeholder">没有对话内容</div>
+        <div v-if="!chat.turns.length" class="placeholder">{{ t('inbox.no-conversation') }}</div>
       </div>
 
       <div class="chat-input-bar">
+        <div class="mode-seg">
+          <button
+            type="button"
+            :class="{ active: chat.mode === 'normal' }"
+            @click="chat.setMode('normal')"
+          >Normal</button>
+          <button
+            type="button"
+            :class="{ active: chat.mode === 'agent' }"
+            @click="chat.setMode('agent')"
+          >Agent</button>
+        </div>
         <textarea
           v-model="draftsQuestion"
-          placeholder="问点什么… (⌘/Ctrl + Enter 发送)"
+          :placeholder="chat.mode === 'agent' ? t('inbox.ask-agent') : t('inbox.ask-normal')"
           @keydown.enter.meta.prevent="submitInline"
           @keydown.enter.ctrl.prevent="submitInline"
         ></textarea>
@@ -308,5 +351,31 @@ void hasConversation
 .tabs {
   display: flex;
   gap: 4px;
+}
+
+.mode-seg {
+  display: inline-flex;
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 1px;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.mode-seg button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.mode-seg button.active {
+  background: rgba(98, 107, 230, 0.32);
+  color: var(--text);
+}
+.mode-seg button:hover:not(.active) {
+  color: var(--text);
 }
 </style>

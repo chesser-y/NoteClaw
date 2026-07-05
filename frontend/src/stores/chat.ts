@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { createChatSession, sendChatMessage } from '../api/chat'
-import type { ChatMessageResponse, Citation, Scope } from '../api/types'
+import type { ChatMessageResponse, ChatReasoningMode, Citation, Scope } from '../api/types'
 
 export type ChatTurn = {
   role: 'user' | 'assistant'
@@ -10,12 +10,21 @@ export type ChatTurn = {
   trace?: ChatMessageResponse['trace']
 }
 
+const MODE_KEY = 'noteclaw.chat-mode'
+const PERSIST_MODE: ChatReasoningMode = (localStorage.getItem(MODE_KEY) as ChatReasoningMode) || 'normal'
+
 export const useChatStore = defineStore('chat', () => {
   const sessionId = ref<string | null>(null)
   const turns = ref<ChatTurn[]>([])
   const sending = ref(false)
   const error = ref<string | null>(null)
   const scope = ref<Scope | null>(null)
+  const mode = ref<ChatReasoningMode>(PERSIST_MODE)
+
+  function setMode(next: ChatReasoningMode) {
+    mode.value = next
+    localStorage.setItem(MODE_KEY, next)
+  }
 
   async function ask(question: string) {
     if (!question.trim() || sending.value) return
@@ -31,6 +40,7 @@ export const useChatStore = defineStore('chat', () => {
         message: question,
         retrieval_mode: 'hybrid',
         use_nanobot_reasoning: false,
+        reasoning_mode: mode.value,
         top_k: 8,
       })
       turns.value.push({
@@ -58,5 +68,5 @@ export const useChatStore = defineStore('chat', () => {
     scope.value = s
   }
 
-  return { sessionId, turns, sending, error, scope, ask, reset, setScope }
+  return { sessionId, turns, sending, error, scope, mode, ask, reset, setScope, setMode }
 })

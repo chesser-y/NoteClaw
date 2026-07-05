@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from noteclaw_backend.domain.enums import ContentType
 from noteclaw_backend.schemas.common import ApiMessage
@@ -50,6 +52,11 @@ async def list_knowledge(
     return KnowledgeListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.get("/_facets")
+async def list_facets() -> dict:
+    return await get_repository().facets()
+
+
 @router.get("/graph", response_model=KnowledgeGraphResponse)
 async def get_knowledge_graph(
     include_notes: bool = True,
@@ -79,6 +86,35 @@ async def get_knowledge(note_id: str) -> NoteDetail:
     if note is None:
         raise HTTPException(status_code=404, detail="Note not found")
     return note
+
+
+def _resolve_stored_path(note) -> Path | None:
+    """Resolve the on-disk file for a note, if any."""
+    meta = getattr(note, "metadata", None)
+    if not isinstance(meta, dict):
+        return None
+    candidate = meta.get("stored_path")
+    if not candidate:
+        return None
+    p = Path(str(candidate))
+    if not p.is_absolute():
+        from noteclaw_backend.settings import get_settings
+
+        root = get_settings().storage_dir
+        rel = str(p).removeprefix("storage/").removeprefix("storage" + str(Path("/")))
+        p = root / rel
+    return p if p.exists() else None
+
+
+@router.get("/{note_id}/file")
+async def get_note_file(note_id: str):
+    note = await get_repository().get_note(note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    path = _resolve_stored_path(note)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Note has no associated file")
+    return FileResponse(str(path), filename=path.name)
 
 
 @router.patch("/{note_id}", response_model=NoteDetail)

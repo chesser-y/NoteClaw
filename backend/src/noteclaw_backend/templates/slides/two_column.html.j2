@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --accent: #626be6;
+    --text: #f4f5f7;
+    --muted: #8b8f99;
+    --left-accent: #4aaeff;
+    --right-accent: #626be6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex;
+    flex-direction: column;
+    padding: 56px 96px 56px;
+  }
+  h2 {
+    font-size: 34px;
+    font-weight: 700;
+    margin-bottom: 28px;
+    letter-spacing: -0.5px;
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    flex: 1;
+  }
+  .col {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    border-top: 3px solid var(--accent);
+  }
+  .col.left { border-top-color: var(--left-accent); }
+  .col.right { border-top-color: var(--right-accent); }
+  .col-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  .col.left .col-title { color: var(--left-accent); }
+  .col.right .col-title { color: var(--right-accent); }
+  ul {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 17px;
+    line-height: 1.45;
+  }
+  li {
+    padding-left: 16px;
+    position: relative;
+  }
+  li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+  <h2>{{ title }}</h2>
+  <div class="columns">
+    <div class="col left">
+      <div class="col-title">{{ left_title | default("Pros") }}</div>
+      <ul>
+        {% for item in left_items %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+    </div>
+    <div class="col right">
+      <div class="col-title">{{ right_title | default("Cons") }}</div>
+      <ul>
+        {% for item in right_items %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

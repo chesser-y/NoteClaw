@@ -91,6 +91,18 @@ a {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   background: var(--bg);
+  transition: grid-template-columns 200ms ease;
+}
+
+@media (min-width: 921px) {
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+
+  .app-shell.sidebar-collapsed .topbar,
+  .app-shell.sidebar-collapsed .topbar.tight {
+    padding-left: 64px;
+  }
 }
 
 .sidebar {
@@ -106,6 +118,7 @@ a {
   user-select: none;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .main-panel {
@@ -136,7 +149,7 @@ a {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding-left: 10px;
+  padding-left: 8px;
   color: var(--text);
   font-weight: 700;
   margin-bottom: 33px;
@@ -231,6 +244,15 @@ a {
   font-weight: 650;
   font-size: 18px;
   transition: background 160ms ease, color 160ms ease;
+}
+
+.nav-link > :first-child {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .nav-link:hover {
@@ -552,13 +574,7 @@ a {
   }
 
   .sidebar {
-    position: static;
-    height: auto;
     border-right: none;
-    border-bottom: 1px solid var(--line);
-    flex-direction: column;
-    padding: 12px;
-    font-size: 16px;
   }
 
   .brand {
@@ -581,6 +597,11 @@ a {
   .drawer-panel {
     width: 100%;
   }
+
+  .topbar.tight,
+  .topbar {
+    padding-left: 64px;
+  }
 }
 
 /* ============ Topbar + tabs (Linear pages) ============ */
@@ -590,7 +611,7 @@ a {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 0 28px;
+  padding: 0 64px 0 28px;
   border-bottom: 1px solid var(--line-soft);
   color: var(--text);
   font-size: 15px;
