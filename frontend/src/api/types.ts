@@ -168,8 +168,12 @@ export type ChatMessageRequest = {
   message: string
   retrieval_mode: SearchMode
   use_nanobot_reasoning?: boolean
+  use_web_research?: boolean
   reasoning_mode?: ChatReasoningMode
   top_k?: number
+  max_reasoning_steps?: number
+  web_results?: number
+  fetch_web_pages?: boolean
 }
 
 export type ChatMessageResponse = {
@@ -186,6 +190,62 @@ export type ChatMessageResponse = {
     review?: AgentReview | null
     workflow_id?: string | null
   }
+}
+
+export type WebSource = {
+  title: string
+  url: string
+  snippet?: string
+  content?: string | null
+  score?: number | null
+  provider?: string | null
+  metadata?: Record<string, unknown>
+}
+
+export type EvidenceAnchor = {
+  id: string
+  source_type: string
+  title: string
+  snippet: string
+  url?: string | null
+  note_id?: string | null
+  chunk_id?: string | null
+  score?: number | null
+  metadata?: Record<string, unknown>
+}
+
+export type NanobotResearchRequest = {
+  question: string
+  retrieval_mode?: SearchMode
+  scope?: Scope
+  top_k?: number
+  max_steps?: number
+  max_sub_questions?: number
+  use_web?: boolean
+  web_results?: number
+  fetch_web_pages?: boolean
+  save_web_evidence?: boolean
+}
+
+export type NanobotResearchStep = {
+  step_index: number
+  objective: string
+  action: string
+  local_citations: Citation[]
+  web_sources: WebSource[]
+  evidence_anchors: EvidenceAnchor[]
+  observation: string
+}
+
+export type NanobotResearchResponse = {
+  question: string
+  answer: string
+  plan: string[]
+  steps: NanobotResearchStep[]
+  citations: Citation[]
+  web_sources: WebSource[]
+  evidence_anchors: EvidenceAnchor[]
+  trace: Record<string, unknown>
 }
 
 export type GenerationRequest = {

@@ -48,12 +48,15 @@ class RetrievalService:
         filters = filters or SearchFilters()
         if mode == SearchMode.KEYWORD:
             rows = await get_repository().keyword_search(query, filters, top_k)
-            return [row for row in rows if self._matches_scope(row, scope)][:top_k]
+            rows = [row for row in rows if self._matches_scope(row, scope)][:top_k]
+            return self._with_display_scores(rows, mode)
         if mode == SearchMode.SEMANTIC:
-            return await self._semantic_search(query, top_k, filters=filters, scope=scope)
+            rows = await self._semantic_search(query, top_k, filters=filters, scope=scope)
+            return self._with_display_scores(rows, mode)
         keyword_rows = await get_repository().keyword_search(query, filters, max(top_k * 2, 10))
         semantic_rows = await self._semantic_search(query, max(top_k * 2, 10), filters=filters, scope=scope)
-        return self._merge_results(keyword_rows, semantic_rows, top_k, scope=scope)
+        rows = self._merge_results(keyword_rows, semantic_rows, top_k, scope=scope)
+        return self._with_display_scores(rows, mode)
 
     async def _semantic_search(
         self,
@@ -102,6 +105,25 @@ class RetrievalService:
         for row in ordered:
             row["score"] = round(scores.get(row["chunk_id"], 0.0), 4)
         return ordered[:top_k]
+
+    def _with_display_scores(self, rows: list[dict], mode: SearchMode) -> list[dict]:
+        if not rows:
+            return rows
+        raw_scores = [float(row.get("score") or 0.0) for row in rows]
+        if mode == SearchMode.SEMANTIC:
+            display_scores = [self._clamp((score + 1.0) / 2.0) for score in raw_scores]
+        else:
+            max_score = max(raw_scores, default=0.0)
+            if max_score <= 0:
+                display_scores = [0.0 for _ in raw_scores]
+            else:
+                display_scores = [self._clamp(score / max_score) for score in raw_scores]
+        for row, score in zip(rows, display_scores):
+            row["score"] = round(score, 4)
+        return rows
+
+    def _clamp(self, value: float) -> float:
+        return max(0.0, min(1.0, value))
 
     def _matches_filters(self, row: dict, filters: SearchFilters) -> bool:
         if filters.content_types and row["content_type"] not in filters.content_types:

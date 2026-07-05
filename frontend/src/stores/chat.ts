@@ -65,12 +65,11 @@ export const useChatStore = defineStore('chat', () => {
     if (!question.trim() || sending.value) return
     turns.value.push({ role: 'user', content: question })
 
-    const liveTrace = newLiveTrace(mode.value)
     const turn: ChatTurn = {
       role: 'assistant',
       content: '',
       citations: [],
-      trace: liveTrace,
+      trace: newLiveTrace(mode.value),
       streaming: true,
     }
     turns.value.push(turn)
@@ -83,14 +82,20 @@ export const useChatStore = defineStore('chat', () => {
         sessionId.value = session.id
       }
 
-      const isAgent = mode.value === 'agent'
-      if (!isAgent) {
+      const currentMode = mode.value
+      const useWeb = currentMode === 'web'
+
+      if (currentMode !== 'agent') {
         const res = await sendChatMessage(sessionId.value!, {
           message: question,
           retrieval_mode: 'hybrid',
-          use_nanobot_reasoning: false,
-          reasoning_mode: mode.value,
+          use_nanobot_reasoning: currentMode === 'deep',
+          use_web_research: useWeb,
+          reasoning_mode: currentMode,
           top_k: 8,
+          max_reasoning_steps: currentMode === 'normal' ? 3 : 4,
+          web_results: 4,
+          fetch_web_pages: useWeb,
         })
         turn.content = res.answer
         turn.citations = res.citations
@@ -105,7 +110,8 @@ export const useChatStore = defineStore('chat', () => {
           message: question,
           retrieval_mode: 'hybrid',
           use_nanobot_reasoning: false,
-          reasoning_mode: mode.value,
+          use_web_research: false,
+          reasoning_mode: currentMode,
           top_k: 8,
         },
         {

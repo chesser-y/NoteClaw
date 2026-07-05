@@ -1,4 +1,4 @@
-﻿"""OpenAI-compatible API adapter for NoteClaw.
+"""OpenAI-compatible API adapter for NoteClaw.
 
 This module provides a thin wrapper around the `AsyncOpenAI` SDK so backend
 service modules can call text completion, embedding, vision, and image APIs
@@ -151,6 +151,20 @@ def _ensure_credentials(endpoint: ProviderEndpoint, usage: str) -> str:
     raise MissingCredentialsError(f"{usage} API key is missing for OpenAI-compatible call.")
 
 
+def _loads_json_object(text: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # Some API models emit JSON-like strings with LaTeX/path backslashes such as \c or \p.
+        # Escape only backslashes that are invalid in JSON, then retry once.
+        repaired = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)
+        repaired = re.sub(r",(\s*[}\]])", r"\1", repaired)
+        parsed = json.loads(repaired)
+    if not isinstance(parsed, dict):
+        raise ValueError("response JSON is not an object")
+    return parsed
+
+
 def _parse_json_payload(payload: str) -> dict[str, Any]:
     """Best-effort parser for model-generated JSON."""
 
@@ -158,28 +172,23 @@ def _parse_json_payload(payload: str) -> dict[str, Any]:
     if not text:
         raise ValueError("model returned empty response")
 
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-
+    candidates = [text]
     fenced = _JSON_FENCE_RE.search(text)
     if fenced is not None:
-        try:
-            return json.loads(fenced.group("json"))
-        except json.JSONDecodeError as exc:
-            raise ValueError("fenced-json parsing failed") from exc
-
+        candidates.append(fenced.group("json"))
     start = text.find("{")
     end = text.rfind("}")
     if start >= 0 and end > start:
-        snippet = text[start : end + 1]
-        try:
-            return json.loads(snippet)
-        except json.JSONDecodeError:
-            pass
+        candidates.append(text[start : end + 1])
 
-    raise ValueError("response is not JSON")
+    errors: list[Exception] = []
+    for candidate in candidates:
+        try:
+            return _loads_json_object(candidate.strip())
+        except (json.JSONDecodeError, ValueError) as exc:
+            errors.append(exc)
+
+    raise ValueError("response is not JSON") from (errors[-1] if errors else None)
 
 
 def _image_to_data_url(image_path: str) -> str:

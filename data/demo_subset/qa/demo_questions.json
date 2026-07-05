@@ -1,31 +1,126 @@
 [
   {
+    "id": "rag_output_impedance",
     "question": "What are the challenges in estimating output impedance in inverter-based grids?",
-    "expected_answer_hint": "Estimating output impedance in inverter-based grids is challenging due to dynamic grid conditions, which require real-time estimation. Traditional methods like signal injection and historical data analysis have limitations, such as sensitivity to noise and complexity.",
+    "expected_answer_hint": "Estimating output impedance in inverter-based grids is challenging due to dynamic grid conditions, real-time requirements, noise sensitivity, and limitations of signal injection or historical data methods.",
     "recommended_files": [
-      "text/arxiv_2410.14077v2_qa.md"
-    ]
+      "text/arxiv_2410.14077v2_qa.md",
+      "cross_modal_pairs/open_ragbench_2410.14077v2_section_1/document.md"
+    ],
+    "modality": "text",
+    "expected_answer": "Estimating output impedance in inverter-based grids is challenging because grid conditions change dynamically, estimation must be close to real time, measurements are noise sensitive, and signal injection or historical data methods have practical limitations."
   },
   {
+    "id": "t2_pickup_code",
     "question": "蜂巢取快递验证码摁错怎么办",
     "expected_answer_hint": "Use the T2Retrieval Chinese note about pickup code / verification code recovery.",
     "recommended_files": [
-      "text/t2_1.md"
-    ]
+      "text/t2_1.md",
+      "text/t2_2.md"
+    ],
+    "modality": "text_zh",
+    "expected_answer": "如果丰巢取件验证码或取件码输错、丢失，可以在柜机选择取快递和取件码取件，点击忘记取件码，输入快递手机号重新获取验证码后取件；也可以关注丰巢智能柜公众号并绑定手机号，用微信扫码取件。"
   },
   {
+    "id": "code_axios_create_instance",
     "question": "How does the axios createInstance helper build a new Axios instance?",
-    "expected_answer_hint": "Look up javascript axios createInstance snippet.",
+    "expected_answer_hint": "Look up the JavaScript Axios createInstance snippet and explain that it creates an Axios context and binds Axios.prototype.request to that context.",
     "recommended_files": [
       "code/javascript_createInstance.js"
-    ]
+    ],
+    "modality": "code",
+    "expected_answer": "createInstance creates a new Axios context from defaultConfig, binds Axios.prototype.request to that context as the callable instance, copies Axios prototype methods and context properties onto the instance, then returns the new Axios instance."
   },
   {
+    "id": "image_financial_table",
     "question": "What information can be read from the financial table image?",
-    "expected_answer_hint": "Use OCR/vision on images/financial_table_image.png and its sidecar metadata.",
+    "expected_answer_hint": "Use the financial table image and sidecar metadata about 2016/2017 net income per share components, debt instrument revaluation, share count and dilution.",
     "recommended_files": [
       "images/financial_table_image.png",
       "images/financial_table_image.md"
-    ]
+    ],
+    "modality": "image_table",
+    "expected_answer": "The financial table describes 2016 and 2017 net income per share components, including current net income excluding non-recurring items, amortization of acquisition-related intangibles, debt instrument revaluation impact, share counts, dilution from bonus shares and warrants, diluted shares, and current or diluted EPS in euros."
+  },
+  {
+    "id": "code_youtube_video_id",
+    "question": "Which helper extracts a YouTube video ID from multiple URL patterns?",
+    "expected_answer_hint": "The Python YouTube.get_vid_from_url helper extracts video IDs from youtu.be, embed, /v/, watch URLs, and query parameters.",
+    "recommended_files": [
+      "code/python_YouTube.get_vid_from_url.py"
+    ],
+    "modality": "code",
+    "expected_answer": "YouTube.get_vid_from_url extracts a video id from youtu.be links, youtube.com embed URLs, /v/ URLs, /watch URLs, the v query parameter, or a nested u query parameter containing v."
+  },
+  {
+    "id": "code_go_pin_ready",
+    "question": "What does mustWaitPinReady do before failing the test?",
+    "expected_answer_hint": "The Go helper waits for the etcd pin endpoint/client connection by issuing cli.Get with a timeout and fails the test if it errors.",
+    "recommended_files": [
+      "code/go_mustWaitPinReady.go"
+    ],
+    "modality": "code",
+    "expected_answer": "mustWaitPinReady creates a timeout context, calls cli.Get(ctx, \"foo\") to wait for the etcd client or pin endpoint to be ready, cancels the context, and fails the test with t.Fatal if an error occurs."
+  },
+  {
+    "id": "code_ruby_kubernetes_events",
+    "question": "What kind of structure does KubernetesResource.fetch_events return?",
+    "expected_answer_hint": "The Ruby snippet returns a hash mapping Kubernetes resource names like pod/web-1 to event message arrays.",
+    "recommended_files": [
+      "code/ruby_KubernetesDeploy.KubernetesResource.fetch_events.rb"
+    ],
+    "modality": "code",
+    "expected_answer": "KubernetesResource.fetch_events returns a hash whose keys are Kubernetes resource ids such as pod/web-1 and whose values are arrays of event messages; it returns an empty hash if the resource does not exist or kubectl event retrieval fails."
+  },
+  {
+    "id": "table_spatial_transcriptomics_mae",
+    "question": "Which feature list has the lowest MAE in the spatial transcriptomics table?",
+    "expected_answer_hint": "The lowest MAE row is n, Ripley's k-function with MAE 3.799.",
+    "recommended_files": [
+      "tables/spatial_transcriptomics_feature_mae.csv"
+    ],
+    "modality": "table",
+    "expected_answer": "The feature list with the lowest MAE is \"n, Ripley's k-function\", with MAE 3.799."
+  },
+  {
+    "id": "image_arxiv_graph_fspec",
+    "question": "Based on the graph sample, what is the impact of correcting for fspec not equal to 1 on the surface density trend?",
+    "expected_answer_hint": "Use the arxivqa graph image/sidecar; the expected multiple-choice answer is C.",
+    "recommended_files": [
+      "images/paper_graph_question.png",
+      "images/paper_graph_question.md"
+    ],
+    "modality": "image_chart",
+    "expected_answer": "The expected graph answer is C: the correction for fspec not equal to 1 changes the interpreted surface density trend according to the chart."
+  },
+  {
+    "id": "image_infographic_apps",
+    "question": "Which category of apps enjoy the least percentage of popularity?",
+    "expected_answer_hint": "Use the infovqa infographic image and sidecar metadata.",
+    "recommended_files": [
+      "images/infographic_question.png",
+      "images/infographic_question.md"
+    ],
+    "modality": "image_infographic"
+  },
+  {
+    "id": "notes_membrane_potential_equations",
+    "question": "Which equations are used to model ion equilibrium potential and multi-ion membrane potential?",
+    "expected_answer_hint": "The neuroscience note explains the Nernst equation for single-ion equilibrium potential and the Goldman-Hodgkin-Katz equation for multi-ion membrane potential.",
+    "recommended_files": [
+      "text/neuroscience_membrane_potential.md"
+    ],
+    "modality": "personal_note",
+    "expected_answer": "The neuroscience note uses the Nernst equation for single-ion equilibrium potential and the Goldman-Hodgkin-Katz equation for multi-ion membrane potential."
+  },
+  {
+    "id": "notes_gabor_orientation_experiment",
+    "question": "What Gabor experiment parameters are used to measure sensitivity to orientation?",
+    "expected_answer_hint": "The vision note mentions Gabor size, orientation, contrast, spatial frequency, a one-second interval, and measuring accuracy as orientation changes.",
+    "recommended_files": [
+      "text/neuroscience_vision_gabor.md"
+    ],
+    "modality": "personal_note",
+    "expected_answer": "The Gabor orientation sensitivity experiment varies parameters such as Gabor size, orientation, contrast, and spatial frequency, uses about a one-second interval, and measures accuracy as orientation changes."
   }
 ]

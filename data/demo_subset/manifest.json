@@ -36,7 +36,7 @@
       "path": "tables/spatial_transcriptomics_feature_mae.csv",
       "source": "NoteClaw/data/open_ragbench/pdf/arxiv/corpus/2401.02564v2.json",
       "note": "Small structured CSV converted from an Open-RAGBench paper table.",
-      "bytes": 199,
+      "bytes": 193,
       "title": "Predicting Future States with Spatial Point Processes in Single Molecule\n  Resolution Spatial Transcriptomics"
     },
     {
@@ -195,15 +195,15 @@
       "kind": "qa",
       "path": "qa/demo_questions.json",
       "source": "assembled from demo_subset manifest",
-      "note": "Suggested questions for search/chat demo.",
-      "bytes": 1280
+      "note": "Expanded questions for search/chat/retrieval benchmark demos.",
+      "bytes": 7578
     },
     {
       "kind": "readme",
       "path": "README.md",
       "source": "generated",
       "note": "Instructions for using the demo subset.",
-      "bytes": 1152
+      "bytes": 2746
     },
     {
       "kind": "cross_modal_pair",
@@ -215,6 +215,25 @@
       "doc_id": "2410.14077v2",
       "section_id": 1,
       "image_count": 1
+    },
+    {
+      "kind": "text",
+      "path": "text/neuroscience_membrane_potential.md",
+      "source": "NoteClaw/data/notes/neuroscience/L2-signal.md",
+      "note": "Personal neuroscience note covering Nernst and Goldman-Hodgkin-Katz membrane potential equations.",
+      "bytes": 5516,
+      "query": "Which equations are used to model ion equilibrium potential and multi-ion membrane potential?"
+    },
+    {
+      "kind": "text",
+      "path": "text/neuroscience_vision_gabor.md",
+      "source": "NoteClaw/data/notes/neuroscience/L3-Vision-System.md",
+      "note": "Personal neuroscience note about visual inference and Gabor orientation sensitivity experiment parameters.",
+      "bytes": 501,
+      "query": "What Gabor experiment parameters are used to measure sensitivity to orientation?"
     }
-  ]
+  ],
+  "expanded_at": "2026-07-05T00:00:00+08:00",
+  "qa_count": 12,
+  "expansion_note": "Expanded with personal-note samples, concrete expected answers, and a broader 12-question retrieval/generation benchmark while keeping the subset lightweight."
 }

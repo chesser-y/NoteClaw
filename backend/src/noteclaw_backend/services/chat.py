@@ -467,14 +467,23 @@ class ChatService:
         context_parts = []
         for index, row in enumerate(rows, start=1):
             context_parts.append(
-                f"Source [{index}] {row['title']} ({row.get('source') or 'knowledge base'})\n{row['text']}"
+                "\n".join(
+                    [
+                        f"Source [{index}] {row['title']} ({row.get('source') or 'knowledge base'})",
+                        f"Relevance score: {row.get('score') if row.get('score') is not None else 'N/A'}",
+                        str(row.get("summary") or ""),
+                        row["text"],
+                    ]
+                )
             )
         messages = [
             {
                 "role": "system",
                 "content": (
                     "You are NoteClaw, a personal knowledge-base assistant. Answer only from the provided context. "
-                    "If the context is insufficient, say so. Keep the answer clear and cite sources like [1], [2] when useful."
+                    "Every key factual claim must cite the source id that supports it, using [1], [2]. "
+                    "Prefer the highest-relevance sources. If evidence is weak or missing, say what is uncertain instead of guessing. "
+                    "Keep the answer clear, concise, and directly responsive to the question."
                 ),
             },
             {
@@ -533,6 +542,7 @@ class ChatService:
             trace=row.trace or {},
             created_at=row.created_at,
         )
+
 
 
 chat_service = ChatService()
