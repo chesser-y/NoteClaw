@@ -184,21 +184,31 @@ class ChatService:
                     "citation_count": len(citations),
                 },
             }
-            if rows:
-                yield {
-                    "event": "status",
-                    "data": {"stage": "generation", "message": "Generating answer", "progress": 0.52},
-                }
-                parts: list[str] = []
-                async for delta in get_llm_provider().stream_text(self._answer_messages(request.message, rows)):
-                    parts.append(delta)
-                    yield {"event": "delta", "data": {"delta": delta}}
-                answer = "".join(parts).strip()
-            else:
-                answer = (
-                    "I could not find relevant content in the current knowledge base. "
-                    "Add or broaden knowledge first, then ask again."
-                )
+            yield {
+                "event": "status",
+                "data": {
+                    "stage": "generation",
+                    "message": (
+                        "Generating answer from retrieved knowledge"
+                        if rows
+                        else "No related local knowledge found; generating a general answer"
+                    ),
+                    "progress": 0.52,
+                    "knowledge_gap": not rows,
+                },
+            }
+            parts: list[str] = []
+            messages = (
+                self._answer_messages(request.message, rows)
+                if rows
+                else self._no_context_answer_messages(request.message)
+            )
+            async for delta in get_llm_provider().stream_text(messages):
+                parts.append(delta)
+                yield {"event": "delta", "data": {"delta": delta}}
+            answer = "".join(parts).strip()
+            if not answer and not rows:
+                answer = self._no_context_fallback_answer(request.message)
                 async for delta in self._text_chunks(answer):
                     yield {"event": "delta", "data": {"delta": delta}}
             response = self._normal_response(session_id, request, reasoning_mode, answer, citations, len(rows))
@@ -521,10 +531,10 @@ class ChatService:
             scope=session_scope.model_dump(),
         )
         citations = self._citations_from_rows(rows)
-        if not rows:
-            answer = "I could not find relevant content in the current knowledge base. Add or broaden knowledge first, then ask again."
-        else:
+        if rows:
             answer = await self._answer_with_context(request.message, rows)
+        else:
+            answer = await self._answer_without_context(request.message)
         return self._normal_response(session_id, request, reasoning_mode, answer, citations, len(rows))
 
     def _normal_response(
@@ -548,6 +558,8 @@ class ChatService:
                     "session_id": session_id,
                     "reasoning_mode": reasoning_mode.value,
                     "retrieved_chunks": retrieved_chunks,
+                    "knowledge_gap": retrieved_chunks == 0,
+                    "answer_source": "knowledge_base" if retrieved_chunks else "general_model",
                 },
             ),
         )
@@ -632,6 +644,10 @@ class ChatService:
     async def _answer_with_context(self, question: str, rows: list[dict]) -> str:
         return (await get_llm_provider().complete_text(self._answer_messages(question, rows))).strip()
 
+    async def _answer_without_context(self, question: str) -> str:
+        answer = (await get_llm_provider().complete_text(self._no_context_answer_messages(question))).strip()
+        return answer or self._no_context_fallback_answer(question)
+
     def _answer_messages(self, question: str, rows: list[dict]) -> list[dict]:
         context_parts = []
         for index, row in enumerate(rows, start=1):
@@ -661,6 +677,35 @@ class ChatService:
             },
         ]
         return messages
+
+    def _no_context_answer_messages(self, question: str) -> list[dict]:
+        return [
+            {
+                "role": "system",
+                "content": (
+                    "You are NoteClaw, a personal knowledge-base assistant. The current database retrieval "
+                    "found no relevant stored knowledge for this question. Still answer the user using general "
+                    "knowledge and reasoning. Start by explicitly stating that the current database does not "
+                    "contain relevant stored knowledge for this question. Do not fabricate citations or imply "
+                    "that the answer is grounded in the local knowledge base. If the answer depends on current "
+                    "or uncertain facts, say what would need to be verified. Match the language of the user's question."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Database retrieval result: no relevant stored knowledge found.\n\n"
+                    f"Question: {question}"
+                ),
+            },
+        ]
+
+    def _no_context_fallback_answer(self, question: str) -> str:
+        return (
+            "当前数据库中没有检索到与这个问题相关的知识。"
+            "我可以先基于通用知识给出初步回答，但这个回答不引用本地知识库内容；"
+            f"如需更可靠的知识库回答，请先补充相关资料。问题：{question}"
+        )
 
     async def _maybe_summarize_title(self, session_id: str, question: str, answer: str) -> None:
         snippet = f"Q: {question[:300]}\nA: {answer[:500]}"

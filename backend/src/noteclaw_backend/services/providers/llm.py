@@ -111,6 +111,12 @@ class FallbackLLMProvider:
         user_text = "\n".join(str(msg.get("content", "")) for msg in messages if msg.get("role") == "user")
         context = _extract_between(user_text, "Context:", "Question:") or user_text
         question = _extract_after(user_text, "Question:") or "the question"
+        if _has_no_local_knowledge_marker(user_text):
+            return (
+                f"The current knowledge base does not contain relevant stored knowledge for '{question.strip()}'. "
+                "I can still provide a general answer, but it is not grounded in your local database. "
+                "For a source-backed answer, add related notes or broaden the knowledge scope."
+            )
         evidence_lines = [line.strip() for line in context.splitlines() if line.strip()]
         useful = [line for line in evidence_lines if not line.lower().startswith("source")][:4]
         if useful:
@@ -235,6 +241,15 @@ def _extract_between(text: str, start: str, end: str) -> str:
 
 def _extract_after(text: str, marker: str) -> str:
     return text.split(marker, 1)[1] if marker in text else ""
+
+
+def _has_no_local_knowledge_marker(text: str) -> bool:
+    lowered = text.lower()
+    return (
+        "no relevant stored knowledge" in lowered
+        or "no related local knowledge" in lowered
+        or "database retrieval result: no relevant" in lowered
+    )
 
 
 def _first_line(text: str) -> str:
