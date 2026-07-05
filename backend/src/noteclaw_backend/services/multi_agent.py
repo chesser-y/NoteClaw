@@ -43,7 +43,12 @@ class MultiAgentWorkflowService:
         workflows = [self._workflows[workflow_id] for workflow_id in ids]
         return workflows[offset : offset + limit], len(workflows)
 
-    async def run(self, request: AgentWorkflowRequest) -> AgentWorkflowResponse:
+    async def run(
+        self,
+        request: AgentWorkflowRequest,
+        *,
+        progress_cb=None,
+    ) -> AgentWorkflowResponse:
         workflow_id = new_id("workflow")
         task_id: str | None = None
         work_item_id: str | None = None
@@ -69,7 +74,16 @@ class MultiAgentWorkflowService:
             work_item_id = task_service._task_to_work_item.get(task.id)
             task_service.mark_running(task.id, "Coordinator planning agents")
 
+        async def _emit(role: str, phase: str, **extra):
+            if progress_cb is None:
+                return
+            try:
+                await progress_cb(role, phase, extra)
+            except Exception:
+                pass
+
         try:
+            await _emit("coordinator", "running")
             plan = await self._coordinator_plan(request)
             steps.append(
                 AgentStep(
@@ -82,8 +96,10 @@ class MultiAgentWorkflowService:
                     artifacts={"plan": plan},
                 )
             )
+            await _emit("coordinator", "done", plan=plan, output="; ".join(plan[:4]))
             self._update_task(task_id, 0.25, "Researcher collecting and structuring evidence")
 
+            await _emit("researcher", "running")
             research = await self._research(request, plan)
             claims = await self._evidence_claims(request.goal, research)
             steps.append(
@@ -102,6 +118,16 @@ class MultiAgentWorkflowService:
                     artifacts={"trace": research.trace, "claims": claims},
                 )
             )
+            await _emit(
+                "researcher",
+                "done",
+                output=(
+                    f"{len(research.citations)} citations · "
+                    f"{len(research.web_sources)} web · "
+                    f"{len(claims)} claims"
+                ),
+                citations=[c.model_dump(mode="json") for c in research.citations[:6]],
+            )
             if work_item_id:
                 task_service.update_work_item(
                     work_item_id,
@@ -112,6 +138,7 @@ class MultiAgentWorkflowService:
                 )
             self._update_task(task_id, 0.58, "Reasoner synthesizing final output")
 
+            await _emit("reasoner", "running")
             synthesis = await self._reason(request.goal, plan, claims, research)
             final_answer = await self._write(request, synthesis, claims, research)
             steps.append(
@@ -125,8 +152,10 @@ class MultiAgentWorkflowService:
                     artifacts={"output_format": request.output_format, "synthesis": synthesis[:1200]},
                 )
             )
+            await _emit("reasoner", "done", output=final_answer[:360])
             self._update_task(task_id, 0.86, "Reviewer checking citations and risks")
 
+            await _emit("reviewer", "running")
             review = await self._review(request.goal, final_answer, claims, research)
             steps.append(
                 AgentStep(
@@ -137,6 +166,12 @@ class MultiAgentWorkflowService:
                     output_summary=f"{review.verdict} · confidence={review.confidence:.2f}",
                     artifacts=review.model_dump(mode="json"),
                 )
+            )
+            await _emit(
+                "reviewer",
+                "done",
+                output=f"{review.verdict} · confidence={review.confidence:.2f}",
+                review=review.model_dump(mode="json"),
             )
 
             if request.create_timeline_item:

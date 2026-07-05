@@ -124,6 +124,22 @@ export type ChatSessionRead = {
   id: string
   title: string
   created_at: string
+  updated_at?: string
+  message_count?: number
+}
+
+export type ChatMessageRead = {
+  id: string
+  role: string
+  content: string
+  citations: Citation[]
+  trace: Record<string, unknown>
+  created_at: string
+}
+
+export type ChatSessionDetail = ChatSessionRead & {
+  scope?: Scope
+  messages: ChatMessageRead[]
 }
 
 export type ChatReasoningMode = 'normal' | 'deep' | 'web' | 'agent'
@@ -133,6 +149,9 @@ export type AgentRole = 'coordinator' | 'researcher' | 'reasoner' | 'reviewer'
 export type AgentStep = {
   role: AgentRole
   title: string
+  action?: string
+  status?: string
+  input?: string | null
   output?: string | null
   duration_ms?: number | null
   citations?: Citation[]

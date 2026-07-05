@@ -154,6 +154,7 @@ class SQLiteKnowledgeRepository:
         source_contains: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        metadata_filters: dict[str, str] | None = None,
     ) -> tuple[list[NoteListItem], int]:
         clauses = []
         params: list[Any] = []
@@ -183,6 +184,10 @@ class SQLiteKnowledgeRepository:
         if date_to:
             clauses.append("date(created_at) <= ?")
             params.append(date_to.isoformat())
+        if metadata_filters:
+            for key, value in metadata_filters.items():
+                clauses.append("json_extract(metadata_json, ?) = ?")
+                params.extend([f"$.{key}", value])
         where = " where " + " and ".join(clauses) if clauses else ""
         with self.store.connect() as conn:
             rows = conn.execute(

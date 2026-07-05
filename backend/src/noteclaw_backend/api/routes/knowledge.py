@@ -32,11 +32,15 @@ async def list_knowledge(
     category: str | None = None,
     source: str | None = None,
     source_contains: str | None = None,
+    review_status: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> KnowledgeListResponse:
+    metadata_filters: dict[str, str] | None = None
+    if review_status:
+        metadata_filters = {"review_status": review_status}
     items, total = await get_repository().list_notes(
         limit,
         offset,
@@ -48,6 +52,7 @@ async def list_knowledge(
         source_contains=source_contains,
         date_from=date_from,
         date_to=date_to,
+        metadata_filters=metadata_filters,
     )
     return KnowledgeListResponse(items=items, total=total, limit=limit, offset=offset)
 
@@ -129,6 +134,25 @@ async def update_knowledge(note_id: str, request: NoteUpdateRequest) -> NoteDeta
     if note is None:
         raise HTTPException(status_code=404, detail="Note not found")
     return note
+
+
+@router.patch("/{note_id}/metadata", response_model=NoteDetail)
+async def patch_note_metadata(
+    note_id: str,
+    payload: dict,
+) -> NoteDetail:
+    note = await get_repository().get_note(note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    metadata = dict(note.metadata or {})
+    for key, value in (payload or {}).items():
+        if value is None:
+            metadata.pop(key, None)
+        else:
+            metadata[key] = value
+    updated = note.model_copy(update={"metadata": metadata})
+    await get_repository().create_note(updated)
+    return updated
 
 
 @router.delete("/{note_id}", response_model=ApiMessage)

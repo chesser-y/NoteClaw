@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
+from typing import Any, AsyncGenerator, Awaitable, Callable, Optional
+
 from noteclaw_backend.domain.enums import ChatReasoningMode
 from noteclaw_backend.schemas.agents import AgentWorkflowRequest
 from noteclaw_backend.schemas.chat import (
+    ChatMessageRead,
     ChatMessageRequest,
     ChatMessageResponse,
     ChatSessionCreate,
+    ChatSessionDetail,
     ChatSessionRead,
     ChatTrace,
 )
@@ -18,30 +25,287 @@ from noteclaw_backend.services.nanobot_research import nanobot_research_service
 from noteclaw_backend.services.reasoning import reasoning_service
 from noteclaw_backend.services.retrieval import retrieval_service
 from noteclaw_backend.settings import get_settings
+from noteclaw_backend.storage.chat_repository import get_chat_repository
+
+logger = logging.getLogger(__name__)
 
 
 class ChatService:
-    def __init__(self) -> None:
-        self._session_scopes: dict[str, Scope] = {}
-
     async def create_session(self, request: ChatSessionCreate) -> ChatSessionRead:
-        session_id = new_id("chat")
-        self._session_scopes[session_id] = request.scope
-        return ChatSessionRead(
-            id=session_id,
+        repo = get_chat_repository()
+        scope_dict = request.scope.model_dump(mode="json") if request.scope else {}
+        row = await repo.create_session(
             title=request.title or "Untitled chat",
-            created_at=utc_now(),
+            scope=scope_dict,
         )
+        return self._session_read(row)
+
+    async def list_sessions(self, limit: int = 50) -> list[ChatSessionRead]:
+        repo = get_chat_repository()
+        rows = await repo.list_sessions(limit=limit)
+        return [self._session_read(row) for row in rows]
+
+    async def get_session(self, session_id: str) -> ChatSessionDetail | None:
+        repo = get_chat_repository()
+        session = await repo.get_session(session_id)
+        if session is None:
+            return None
+        messages = await repo.list_messages(session_id, limit=200)
+        return ChatSessionDetail(
+            id=session.id,
+            title=session.title,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+            message_count=session.message_count,
+            scope=Scope(**session.scope) if session.scope else Scope(),
+            messages=[self._message_read(m) for m in messages],
+        )
+
+    async def rename_session(self, session_id: str, title: str) -> ChatSessionRead | None:
+        repo = get_chat_repository()
+        existing = await repo.get_session(session_id)
+        if existing is None:
+            return None
+        await repo.rename_session(session_id, title)
+        session = await repo.get_session(session_id)
+        return self._session_read(session) if session else None
+
+    async def delete_session(self, session_id: str) -> bool:
+        repo = get_chat_repository()
+        existing = await repo.get_session(session_id)
+        if existing is None:
+            return False
+        await repo.delete_session(session_id)
+        return True
 
     async def send_message(
         self,
         session_id: str,
         request: ChatMessageRequest,
     ) -> ChatMessageResponse:
-        session_scope = self._session_scopes.get(session_id, Scope())
+        repo = get_chat_repository()
+        session = await repo.get_session(session_id)
+        if session is None:
+            raise ValueError(f"Chat session {session_id} not found")
+        session_scope = Scope(**session.scope) if session.scope else Scope()
         scope = session_scope.model_dump()
         reasoning_mode = self._resolve_reasoning_mode(request)
 
+        await repo.append_message(
+            session_id=session_id,
+            role="user",
+            content=request.message,
+            citations=[],
+            trace={
+                "retrieval_mode": request.retrieval_mode.value,
+                "reasoning_mode": reasoning_mode.value,
+            },
+        )
+
+        response = await self._dispatch_response(
+            session_id, request, session_scope, scope, reasoning_mode
+        )
+
+        trace_meta: dict[str, Any] = dict(response.trace.metadata or {})
+        await repo.append_message(
+            session_id=session_id,
+            role="assistant",
+            content=response.answer,
+            citations=[c.model_dump(mode="json") for c in response.citations],
+            trace={
+                "retrieval_mode": response.trace.retrieval_mode.value,
+                "used_nanobot": response.trace.used_nanobot,
+                "model": response.trace.model,
+                "metadata": trace_meta,
+            },
+        )
+
+        if session.message_count == 0:
+            await self._maybe_summarize_title(session_id, request.message, response.answer)
+
+        await self._maybe_persist_low_confidence(request, response, session_id, trace_meta)
+
+        return response
+
+    async def send_message_streaming(
+        self,
+        session_id: str,
+        request: ChatMessageRequest,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        repo = get_chat_repository()
+        session = await repo.get_session(session_id)
+        if session is None:
+            yield {"event": "error", "data": {"detail": f"Chat session {session_id} not found"}}
+            return
+
+        session_scope = Scope(**session.scope) if session.scope else Scope()
+        scope = session_scope.model_dump()
+        reasoning_mode = self._resolve_reasoning_mode(request)
+
+        await repo.append_message(
+            session_id=session_id,
+            role="user",
+            content=request.message,
+            citations=[],
+            trace={
+                "retrieval_mode": request.retrieval_mode.value,
+                "reasoning_mode": reasoning_mode.value,
+            },
+        )
+
+        yield {
+            "event": "start",
+            "data": {
+                "reasoning_mode": reasoning_mode.value,
+                "retrieval_mode": request.retrieval_mode.value,
+                "session_id": session_id,
+            },
+        }
+
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+
+        async def progress_cb(role: str, phase: str, extra: dict[str, Any]) -> None:
+            payload: dict[str, Any] = {"role": role, "phase": phase}
+            for key, value in (extra or {}).items():
+                payload[key] = self._safe_json(value)
+            await queue.put({"event": "step", "data": payload})
+
+        dispatch_task = asyncio.ensure_future(
+            self._dispatch_response(
+                session_id,
+                request,
+                session_scope,
+                scope,
+                reasoning_mode,
+                progress_cb=progress_cb if reasoning_mode == ChatReasoningMode.AGENT else None,
+            )
+        )
+
+        get_task: Optional[asyncio.Task] = None
+        try:
+            while True:
+                if get_task is None:
+                    get_task = asyncio.ensure_future(queue.get())
+                done, _pending = await asyncio.wait(
+                    {dispatch_task, get_task}, return_when=asyncio.FIRST_COMPLETED
+                )
+                if get_task in done:
+                    try:
+                        evt = get_task.result()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("progress queue error: %s", exc)
+                    else:
+                        if evt is not None:
+                            yield evt
+                    get_task = None
+                if dispatch_task in done:
+                    while not queue.empty():
+                        evt = queue.get_nowait()
+                        if evt is not None:
+                            yield evt
+                    break
+        finally:
+            if get_task is not None and not get_task.done():
+                get_task.cancel()
+
+        exc = dispatch_task.exception()
+        if exc is not None:
+            yield {"event": "error", "data": {"detail": str(exc) or "workflow failed"}}
+            return
+
+        response = await dispatch_task
+
+        trace_meta: dict[str, Any] = dict(response.trace.metadata or {})
+        await repo.append_message(
+            session_id=session_id,
+            role="assistant",
+            content=response.answer,
+            citations=[c.model_dump(mode="json") for c in response.citations],
+            trace={
+                "retrieval_mode": response.trace.retrieval_mode.value,
+                "used_nanobot": response.trace.used_nanobot,
+                "model": response.trace.model,
+                "metadata": trace_meta,
+            },
+        )
+
+        if session.message_count == 0:
+            await self._maybe_summarize_title(session_id, request.message, response.answer)
+
+        await self._maybe_persist_low_confidence(request, response, session_id, trace_meta)
+
+        yield {"event": "done", "data": response.model_dump(mode="json")}
+
+    def _safe_json(self, value: Any) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        try:
+            json.dumps(value)
+            return value
+        except (TypeError, ValueError):
+            try:
+                return str(value)
+            except Exception:
+                return None
+
+    async def _maybe_persist_low_confidence(
+        self,
+        request: ChatMessageRequest,
+        response: ChatMessageResponse,
+        session_id: str,
+        trace_meta: dict[str, Any],
+    ) -> None:
+        review = trace_meta.get("review") if isinstance(trace_meta, dict) else None
+        if not isinstance(review, dict):
+            return
+        confidence = review.get("confidence")
+        verdict = review.get("verdict")
+        is_low = (confidence is not None and float(confidence) < 0.6) or verdict not in (None, "approved")
+        if not is_low:
+            return
+        try:
+            from noteclaw_backend.storage.repositories import get_repository
+            from noteclaw_backend.schemas.knowledge import NoteDetail
+            from noteclaw_backend.domain.enums import NoteStatus, ContentType
+
+            now = utc_now()
+            note = NoteDetail(
+                id=new_id("note"),
+                title=f"Low-confidence answer · {request.message[:60]}",
+                content_type=ContentType.TEXT,
+                content=response.answer,
+                summary=request.message[:200],
+                tags=["chat", "low-confidence"],
+                category="chat_review",
+                source="chat_low_confidence",
+                source_url=None,
+                status=NoteStatus.READY,
+                created_at=now,
+                updated_at=now,
+                metadata={
+                    "review_status": "pending",
+                    "session_id": session_id,
+                    "confidence": confidence,
+                    "verdict": verdict,
+                    "risks": review.get("risks") or [],
+                    "question": request.message[:400],
+                },
+                chunks=[],
+            )
+            await get_repository().create_note(note)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("failed to persist low-confidence answer: %s", exc)
+
+    async def _dispatch_response(
+        self,
+        session_id: str,
+        request: ChatMessageRequest,
+        session_scope: Scope,
+        scope: dict[str, Any],
+        reasoning_mode: ChatReasoningMode,
+        *,
+        progress_cb: Callable[[str, str, dict[str, Any]], Awaitable[None]] | None = None,
+    ) -> ChatMessageResponse:
         if reasoning_mode == ChatReasoningMode.AGENT:
             workflow = await multi_agent_workflow_service.run(
                 AgentWorkflowRequest(
@@ -56,7 +320,8 @@ class ChatService:
                     output_format="answer",
                     create_work_item=True,
                     create_timeline_item=True,
-                )
+                ),
+                progress_cb=progress_cb,
             )
             return ChatMessageResponse(
                 message_id=new_id("msg"),
@@ -218,6 +483,56 @@ class ChatService:
             },
         ]
         return (await get_llm_provider().complete_text(messages)).strip()
+
+    async def _maybe_summarize_title(self, session_id: str, question: str, answer: str) -> None:
+        snippet = f"Q: {question[:300]}\nA: {answer[:500]}"
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Summarize the following conversation into a short title of 6 to 10 words. "
+                    "No punctuation, no quotes, no prefix like 'Title:'. Output only the title text. "
+                    "Match the language of the user's question."
+                ),
+            },
+            {"role": "user", "content": snippet},
+        ]
+        try:
+            summary = (await get_llm_provider().complete_text(messages)).strip()
+            summary = summary.splitlines()[0].strip('"“”‘’ ')[:80]
+            if summary:
+                await self._rename(session_id, summary)
+                return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("session title summarization failed: %s", exc)
+        fallback = question.strip().splitlines()[0][:40] or "Untitled chat"
+        try:
+            await self._rename(session_id, fallback)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("failed to set fallback session title: %s", exc)
+
+    async def _rename(self, session_id: str, title: str) -> None:
+        repo = get_chat_repository()
+        await repo.rename_session(session_id, title)
+
+    def _session_read(self, row) -> ChatSessionRead:
+        return ChatSessionRead(
+            id=row.id,
+            title=row.title,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            message_count=row.message_count,
+        )
+
+    def _message_read(self, row) -> ChatMessageRead:
+        return ChatMessageRead(
+            id=row.id,
+            role=row.role,
+            content=row.content,
+            citations=[Citation(**c) if isinstance(c, dict) else c for c in row.citations],
+            trace=row.trace or {},
+            created_at=row.created_at,
+        )
 
 
 chat_service = ChatService()
