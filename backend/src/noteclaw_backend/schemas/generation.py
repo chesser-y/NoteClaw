@@ -33,3 +33,7 @@ class GenerationPreviewResponse(BaseModel):
     generation_type: GenerationType
     content: dict[str, Any] | str
     citations: list[Citation] = Field(default_factory=list)
+    note_id: str | None = None
+    artifact_url: str | None = None
+    download_url: str | None = None
+    document_extension: str | None = None

@@ -61,17 +61,14 @@ http://127.0.0.1:8000/api
   -> 前端保存 session_id
 
 用户发送问题
-  -> POST /api/chat/sessions/{session_id}/messages
+  -> POST /api/chat/sessions/{session_id}/messages/stream
   -> 后端检索相关 chunks
   -> 后端调用 LLM 或 nanobot 推理路径
-  -> 返回 answer + citations + trace
+  -> 流式返回 status / delta / final
+  -> final 中包含 answer + citations + trace
 ```
 
-MVP 阶段先使用非流式响应。后续如果要做流式输出，可以新增：
-
-```text
-GET /api/chat/sessions/{session_id}/stream?message_id=...
-```
+兼容接口 `POST /api/chat/sessions/{session_id}/messages` 仍保留，返回一次性 JSON。
 
 ## 内容生成流程
 

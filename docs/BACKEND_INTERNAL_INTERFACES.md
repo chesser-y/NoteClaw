@@ -117,6 +117,25 @@ class ImageProvider:
 - `EMBEDDING_MODEL`
 - `VISION_MODEL`
 - `IMAGE_MODEL`
+- 按能力可选覆盖（推荐在成本敏感场景使用）：
+  - `OPENAI_COMPAT_CHAT_API_KEY`
+  - `OPENAI_COMPAT_CHAT_BASE_URL`
+  - `OPENAI_COMPAT_CHAT_MODEL`
+  - `OPENAI_COMPAT_EMBEDDING_API_KEY`
+  - `OPENAI_COMPAT_EMBEDDING_BASE_URL`
+  - `OPENAI_COMPAT_EMBEDDING_MODEL`
+  - `OPENAI_COMPAT_VISION_API_KEY`
+  - `OPENAI_COMPAT_VISION_BASE_URL`
+  - `OPENAI_COMPAT_VISION_MODEL`
+  - `OPENAI_COMPAT_IMAGE_API_KEY`
+  - `OPENAI_COMPAT_IMAGE_BASE_URL`
+  - `OPENAI_COMPAT_IMAGE_MODEL`
+
+实现建议：
+
+- 缺省只配置主网关与全局 key。
+- 按能力覆盖时，仅对目标能力覆盖 `api_key`、`base_url`、`model`。
+- 默认值：对话 `gpt-4o`，embedding `text-embedding-3-small`，视觉 `gpt-4o`，图像 `gpt-image-1`。
 
 ## IngestionService
 

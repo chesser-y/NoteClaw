@@ -1,60 +1,175 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
-import PageHeader from '../components/PageHeader.vue'
-import EmptyState from '../components/EmptyState.vue'
-import TaskBadge from '../components/TaskBadge.vue'
+import { computed, onMounted, ref } from 'vue'
 import { useTaskStore } from '../stores/tasks'
+import type { TaskRead, TaskStatus } from '../api/types'
+import TaskDetailDrawer from '../components/tasks/TaskDetailDrawer.vue'
 
-const taskStore = useTaskStore()
+const store = useTaskStore()
+const selected = ref<TaskRead | null>(null)
 
-onMounted(() => {
-  taskStore.refresh()
+onMounted(() => store.refresh())
+
+const buckets = computed(() => {
+  const queued: TaskRead[] = []
+  const inProgress: TaskRead[] = []
+  const done: TaskRead[] = []
+  for (const t of store.tasks) {
+    if (t.status === 'queued') queued.push(t)
+    else if (t.status === 'running') inProgress.push(t)
+    else if (t.status === 'succeeded' || t.status === 'failed') done.push(t)
+  }
+  return {
+    queued,
+    inProgress,
+    review: [] as TaskRead[],
+    done,
+  }
 })
+
+const statusRingClass = (status: TaskStatus) => {
+  if (status === 'succeeded') return 'blue'
+  if (status === 'failed') return 'gray'
+  return ''
+}
+
+const shortId = (id: string) => id.slice(0, 12)
+
+const titleFromTask = (t: TaskRead) => {
+  if (t.message && t.message.length > 4) return t.message
+  return t.type
+}
+
+const progressLabel = (t: TaskRead) => `${Math.round(t.progress * 100)}%`
+
+function openTask(t: TaskRead) {
+  selected.value = t
+}
 </script>
 
 <template>
-  <section class="content-wrap">
-    <PageHeader
-      eyebrow="Tasks"
-      title="任务中心"
-      description="入库、OCR、多模态理解、PPTX、生图、nanobot 检索等耗时流程都会以 task 的形式追踪。"
-    />
+  <section class="tasks-view">
+    <header class="topbar tight">
+      <span>Tasks</span>
+      <span class="spacer"></span>
+    </header>
 
-    <div class="mb-5 flex justify-end">
-      <button class="btn" type="button" @click="taskStore.refresh">
-        <RefreshCw :size="16" />
-        刷新任务
-      </button>
-    </div>
-
-    <div v-if="taskStore.error" class="mb-6 border border-[#70433b] bg-[#261716] p-4 text-sm text-[#f0b8ad]">
-      {{ taskStore.error }}
-    </div>
-
-    <div v-if="taskStore.tasks.length" class="space-y-3">
-      <article v-for="task in taskStore.tasks" :key="task.id" class="surface grid gap-4 p-5 md:grid-cols-[1fr_auto]">
-        <div>
-          <div class="mb-2 flex flex-wrap items-center gap-3">
-            <h3 class="text-lg text-white">{{ task.type }}</h3>
-            <TaskBadge :status="task.status" />
+    <div class="kanban">
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring gray"></span>
+          Queued
+          <span class="count">{{ buckets.queued.length }}</span>
+          <span class="plus">+</span>
+        </div>
+        <div
+          v-for="t in buckets.queued"
+          :key="t.id"
+          class="task-card"
+          @click="openTask(t)"
+        >
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring gray"></span>
+            {{ titleFromTask(t) }}
           </div>
-          <p class="mb-3 text-sm text-[#9aa3a0]">{{ task.message || '等待任务消息' }}</p>
-          <div class="h-2 w-full bg-[#202525]">
-            <div class="h-full bg-[#d9d2bf]" :style="{ width: `${Math.round(task.progress * 100)}%` }"></div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--muted);"></span>{{ progressLabel(t) }}</span>
           </div>
         </div>
-        <div class="text-right text-sm text-[#8f9996]">
-          <div>{{ task.id }}</div>
-          <div class="mt-2">{{ Math.round(task.progress * 100) }}%</div>
+        <div v-if="!buckets.queued.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
+      </div>
+
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring"></span>
+          In progress
+          <span class="count">{{ buckets.inProgress.length }}</span>
+          <span class="plus">+</span>
         </div>
-      </article>
+        <div
+          v-for="t in buckets.inProgress"
+          :key="t.id"
+          class="task-card"
+          @click="openTask(t)"
+        >
+          <span class="pill right-chip">Working... <span class="small-dot" style="color: var(--orange);"></span></span>
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring"></span>
+            {{ titleFromTask(t) }}
+          </div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--orange);"></span>{{ progressLabel(t) }}</span>
+          </div>
+        </div>
+        <div v-if="!buckets.inProgress.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
+      </div>
+
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring" style="border-color: var(--orange);"></span>
+          Need review
+          <span class="count">{{ buckets.review.length }}</span>
+          <span class="plus">+</span>
+        </div>
+        <div
+          v-for="t in buckets.review"
+          :key="t.id"
+          class="task-card"
+          @click="openTask(t)"
+        >
+          <span class="pill right-chip">Waiting <span class="small-dot" style="color: var(--orange);"></span></span>
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring"></span>
+            {{ titleFromTask(t) }}
+          </div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--blue);"></span>Review</span>
+          </div>
+        </div>
+        <div v-if="!buckets.review.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
+      </div>
+
+      <div class="kanban-col">
+        <div class="col-title">
+          <span class="status-ring green"></span>
+          Done
+          <span class="count">{{ buckets.done.length }}</span>
+          <span class="plus">+</span>
+        </div>
+        <div
+          v-for="t in buckets.done"
+          :key="t.id"
+          class="task-card"
+          @click="openTask(t)"
+        >
+          <div class="task-id">{{ shortId(t.id) }}</div>
+          <div class="task-title">
+            <span class="status-ring" :class="statusRingClass(t.status)">✓</span>
+            {{ titleFromTask(t) }}
+          </div>
+          <div class="task-tags">
+            <span class="pill square">{{ t.type }}</span>
+            <span class="pill square"><span class="small-dot" style="color: var(--green);"></span>{{ t.status }}</span>
+          </div>
+        </div>
+        <div v-if="!buckets.done.length" class="muted" style="font-size: 12px; padding: 12px;">No items</div>
+      </div>
     </div>
 
-    <EmptyState
-      v-else
-      title="暂无任务"
-      description="创建入库、生成或 nanobot 搜集任务后，这里会展示任务进度和结果。"
-    />
+    <TaskDetailDrawer v-if="selected" :task="selected" :loading="false" @close="selected = null" />
   </section>
 </template>
+
+<style scoped>
+.tasks-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+</style>

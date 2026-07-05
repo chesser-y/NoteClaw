@@ -27,12 +27,47 @@ class SearchMode(StrEnum):
     HYBRID = "hybrid"
 
 
+class ChatReasoningMode(StrEnum):
+    NORMAL = "normal"
+    DEEP = "deep"
+    WEB = "web"
+    AGENT = "agent"
+
+
+class AgentRole(StrEnum):
+    COORDINATOR = "coordinator"
+    RESEARCHER = "researcher"
+    REASONER = "reasoner"
+    REVIEWER = "reviewer"
+
+
 class TaskStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class WorkItemStatus(StrEnum):
+    QUEUED = "queued"
+    IN_PROGRESS = "in_progress"
+    NEED_REVIEW = "need_review"
+    DONE = "done"
+
+
+class TimelineKind(StrEnum):
+    RESEARCH = "research"
+    SOURCE = "source"
+    OUTPUT = "output"
+
+
+class TimelineItemStatus(StrEnum):
+    PLANNED = "planned"
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    MILESTONE = "milestone"
+    DONE = "done"
 
 
 class GenerationType(StrEnum):
@@ -53,3 +88,4 @@ class TaskType(StrEnum):
     VISION_ENRICHMENT = "vision_enrichment"
     GENERATION = "generation"
     HARNESS = "harness"
+    AGENT_WORKFLOW = "agent_workflow"

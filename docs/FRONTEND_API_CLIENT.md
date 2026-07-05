@@ -74,18 +74,27 @@ async function sendKnowledgeQuestion(message: string) {
   messages.push({ id: crypto.randomUUID(), role: "user", content: message });
   messages.push({ id: "pending", role: "assistant", content: "", pending: true });
 
-  const answer = await sendChatMessage(activeSessionId, {
+  await sendChatMessageStream(activeSessionId, {
     message,
     retrieval_mode: "hybrid",
-    use_nanobot_reasoning: false,
+    reasoning_mode: "normal",
     top_k: 8,
-  });
-
-  replacePendingMessage({
-    id: answer.message_id,
-    role: "assistant",
-    content: answer.answer,
-    citations: answer.citations,
+  }, {
+    onStatus(status) {
+      updatePendingMessage({ status: status.message });
+    },
+    onDelta(delta) {
+      appendPendingMessage(delta);
+    },
+    onFinal(answer) {
+      replacePendingMessage({
+        id: answer.message_id,
+        role: "assistant",
+        content: answer.answer,
+        citations: answer.citations,
+        trace: answer.trace,
+      });
+    },
   });
 }
 ```
@@ -147,7 +156,22 @@ export function sendChatMessage(sessionId: string, payload: ChatMessageRequest) 
     body: JSON.stringify(payload),
   });
 }
+
+export async function sendChatMessageStream(
+  sessionId: string,
+  payload: ChatMessageRequest,
+  handlers: {
+    onStatus?: (status: ChatStreamStatus) => void;
+    onDelta?: (delta: string) => void;
+    onFinal?: (response: ChatMessageResponse) => void;
+  },
+) {
+  // Use fetch + ReadableStream for POST SSE. EventSource cannot send JSON body.
+  // Parse event: status / delta / final / error blocks from text/event-stream.
+}
 ```
+
+交互式问答优先使用 `sendChatMessageStream`；`sendChatMessage` 保留给脚本、测试和不需要流式体验的调用。
 
 ### 内容生成
 

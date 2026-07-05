@@ -15,6 +15,12 @@ class NanobotHarness:
                 f"Nanobot harness job '{request.job_type}' queued. "
                 "Final invocation strategy pending."
             ),
+            work_item_title=request.instruction[:120] or f"Nanobot {request.job_type} task",
+            tags=["agent", request.job_type],
+            material_count=len(request.inputs),
+            current_stage="Queued for agent execution",
+            requires_confirmation=True,
+            metadata={"job_type": request.job_type},
         )
         return HarnessJobResponse(
             task_id=task.id,

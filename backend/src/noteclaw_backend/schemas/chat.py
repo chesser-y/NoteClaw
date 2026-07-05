@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from noteclaw_backend.domain.enums import SearchMode
+from noteclaw_backend.domain.enums import AgentRole, ChatReasoningMode, SearchMode
 from noteclaw_backend.schemas.common import Citation, Scope
 
 
@@ -18,13 +18,54 @@ class ChatSessionRead(BaseModel):
     id: str
     title: str
     created_at: datetime
+    updated_at: datetime | None = None
+    message_count: int = 0
+    is_favorite: bool = False
+
+
+class ChatMessageRead(BaseModel):
+    id: str
+    role: str
+    content: str
+    citations: list[Citation] = Field(default_factory=list)
+    trace: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class ChatSessionDetail(ChatSessionRead):
+    scope: Scope = Field(default_factory=Scope)
+    messages: list[ChatMessageRead] = Field(default_factory=list)
+
+
+class ChatSessionPatch(BaseModel):
+    title: str | None = None
 
 
 class ChatMessageRequest(BaseModel):
     message: str = Field(min_length=1)
     retrieval_mode: SearchMode = SearchMode.HYBRID
+    reasoning_mode: ChatReasoningMode = ChatReasoningMode.NORMAL
     use_nanobot_reasoning: bool = False
+    use_web_research: bool = False
     top_k: int = Field(default=8, ge=1, le=30)
+    max_reasoning_steps: int = Field(default=4, ge=1, le=8)
+    web_results: int = Field(default=4, ge=1, le=10)
+    fetch_web_pages: bool = True
+
+
+class ChatAgentStep(BaseModel):
+    role: AgentRole
+    title: str
+    output: str | None = None
+    duration_ms: int | None = None
+    citations: list[Citation] = Field(default_factory=list)
+
+
+class ChatAgentReview(BaseModel):
+    verdict: str | None = None
+    confidence: float | None = None
+    risks: list[str] = Field(default_factory=list)
+    needs_user_confirmation: bool = False
 
 
 class ChatTrace(BaseModel):
@@ -32,6 +73,10 @@ class ChatTrace(BaseModel):
     used_nanobot: bool
     model: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    steps: list[ChatAgentStep] = Field(default_factory=list)
+    plan: list[str] = Field(default_factory=list)
+    review: ChatAgentReview | None = None
+    workflow_id: str | None = None
 
 
 class ChatMessageResponse(BaseModel):
