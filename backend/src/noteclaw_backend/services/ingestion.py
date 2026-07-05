@@ -10,6 +10,7 @@ from noteclaw_backend.schemas.common import new_id, utc_now
 from noteclaw_backend.schemas.ingest import IngestRequest, IngestResponse
 from noteclaw_backend.schemas.knowledge import ChunkRead, NoteDetail
 from noteclaw_backend.services.document_parser import ParsedDocument, parse_file_bytes
+from noteclaw_backend.services.image_analysis import extract_vision_text
 from noteclaw_backend.services.providers import (
     get_embedding_provider,
     get_llm_provider,
@@ -84,7 +85,7 @@ class IngestionService:
                         str(saved_path),
                         parsed.metadata.get("ocr_text"),
                     )
-                    description = str(vision.get("description", "")).strip()
+                    description = extract_vision_text(vision)
                     if description and description not in parsed.content:
                         parsed = ParsedDocument(
                             content_type=parsed.content_type,

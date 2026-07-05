@@ -43,9 +43,13 @@ const fileUrl = computed(() => {
   return `${API_BASE}/knowledge/${note.value.id}/file`
 })
 
-const hasFile = computed(() => {
+const noteMetadata = computed<Record<string, unknown>>(() => {
   const meta = (note.value as NoteDetail & { metadata?: Record<string, unknown> } | null)?.metadata
-  return Boolean(meta && typeof meta === 'object' && 'stored_path' in meta)
+  return meta && typeof meta === 'object' ? meta : {}
+})
+
+const hasFile = computed(() => {
+  return typeof noteMetadata.value.stored_path === 'string' && noteMetadata.value.stored_path.length > 0
 })
 
 const contentKind = computed<'markdown' | 'code' | 'html' | 'image' | 'pdf' | 'table' | 'text' | 'unknown'>(() => {
@@ -68,6 +72,30 @@ const renderedMarkdown = computed(() => {
   if (!note.value) return ''
   if (contentKind.value !== 'markdown') return ''
   return note.value.content || ''
+})
+
+const markdownImageUrl = computed(() => {
+  const content = note.value?.content || ''
+  const match = content.match(/!\[[^\]]*\]\((data:image\/[^)\s]+|https?:\/\/[^)\s]+)\)/)
+  return match?.[1] || ''
+})
+
+const metadataImageUrl = computed(() => {
+  const value = noteMetadata.value.image_url
+  return typeof value === 'string' ? value : ''
+})
+
+const imagePreviewUrl = computed(() => {
+  if (hasFile.value) return fileUrl.value
+  return metadataImageUrl.value || markdownImageUrl.value
+})
+
+const imageAnalysisText = computed(() => {
+  if (!note.value || contentKind.value !== 'image') return ''
+  return (note.value.content || '')
+    .replace(/!\[[^\]]*\]\((?:data:image\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, '')
+    .replace(/^Generated image is stored as an attached file\.$/gim, '')
+    .trim()
 })
 
 const codeLanguage = computed(() => {
@@ -135,9 +163,14 @@ const tableRows = computed<string[][]>(() => {
             <FileWarning :size="20" /> {{ error }}
           </div>
           <template v-else-if="note">
-            <div v-if="contentKind === 'image'" class="media-wrap">
-              <img v-if="hasFile" :src="fileUrl" :alt="note.title" />
+            <div v-if="contentKind === 'image'" class="image-note-wrap">
+              <div v-if="imagePreviewUrl" class="image-canvas">
+                <img :src="imagePreviewUrl" :alt="note.title" />
+              </div>
               <pre v-else class="fallback-text">{{ note.content }}</pre>
+              <article v-if="imagePreviewUrl && imageAnalysisText" class="image-analysis">
+                <MarkdownView :content="imageAnalysisText" />
+              </article>
             </div>
 
             <div v-else-if="contentKind === 'pdf'" class="media-wrap">
@@ -325,6 +358,49 @@ const tableRows = computed<string[][]>(() => {
   border: 0;
   background: white;
   border-radius: 6px;
+}
+
+.image-note-wrap {
+  min-height: 100%;
+  padding: 16px;
+  display: grid;
+  grid-template-rows: minmax(220px, auto) auto;
+  gap: 14px;
+}
+.image-canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.image-canvas img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 300px);
+  object-fit: contain;
+}
+.image-analysis {
+  max-width: 820px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.image-analysis :deep(h1) {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.image-analysis :deep(p) {
+  margin: 6px 0;
 }
 
 .code-wrap {

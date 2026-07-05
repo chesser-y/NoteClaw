@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
 from datetime import datetime
@@ -245,18 +247,53 @@ class GenerationService:
         if gtype == GenerationType.IMAGE:
             data = content if isinstance(content, dict) else {}
             prompt = str(data.get("prompt") or "")
-            url = data.get("url")
+            url = str(data.get("url") or "")
+            stored_path, image_meta = self._store_generated_image_url(url)
             md_lines = [f"# Image prompt", "", prompt]
-            if url:
+            if stored_path:
+                md_lines += ["", "Generated image is stored as an attached file."]
+            elif url:
                 md_lines += ["", f"![generated image]({url})"]
-            extra_meta: dict[str, Any] = {"image_prompt": prompt[:600]}
-            if url:
-                extra_meta["image_url"] = url
-            return "\n".join(md_lines), ContentType.IMAGE, None, extra_meta
+            extra_meta: dict[str, Any] = {"image_prompt": prompt[:600], **image_meta}
+            return "\n".join(md_lines), ContentType.IMAGE, stored_path, extra_meta
 
         # Fallback: dump as pretty JSON inside a fenced block.
         body = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False, indent=2)
         return f"```json\n{body}\n```", ContentType.TEXT, None, {}
+
+    def _store_generated_image_url(self, url: str) -> tuple[Path | None, dict[str, Any]]:
+        if not url:
+            return None, {}
+        match = re.match(r"^data:(image/[A-Za-z0-9.+-]+);base64,(.+)$", url, flags=re.DOTALL)
+        if not match:
+            return None, {"image_url": url}
+
+        mime = match.group(1).lower()
+        payload = re.sub(r"\s+", "", match.group(2))
+        try:
+            data = base64.b64decode(payload, validate=True)
+        except (binascii.Error, ValueError):
+            return None, {"image_data_error": "invalid_data_url", "image_mime": mime}
+        if not data:
+            return None, {"image_data_error": "empty_data_url", "image_mime": mime}
+
+        extension = {
+            "image/jpeg": "jpg",
+            "image/jpg": "jpg",
+            "image/png": "png",
+            "image/webp": "webp",
+            "image/gif": "gif",
+            "image/bmp": "bmp",
+        }.get(mime, "png")
+        out_dir = get_settings().storage_dir / "generated_images"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{new_id('img')}.{extension}"
+        path.write_bytes(data)
+        return path, {
+            "image_mime": mime,
+            "image_bytes": len(data),
+            "image_stored_from": "data_url",
+        }
 
     def _ppt_outline_to_markdown(self, outline: dict[str, Any]) -> str:
         title = str(outline.get("title") or "Untitled deck").strip()

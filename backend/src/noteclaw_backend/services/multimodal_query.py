@@ -10,6 +10,7 @@ from noteclaw_backend.schemas.common import new_id
 from noteclaw_backend.schemas.multimodal import MultimodalQueryContext, MultimodalSearchResponse
 from noteclaw_backend.schemas.search import SearchResult
 from noteclaw_backend.services.document_parser import parse_file_bytes
+from noteclaw_backend.services.image_analysis import extract_vision_text
 from noteclaw_backend.services.providers import get_vision_provider
 from noteclaw_backend.services.retrieval import retrieval_service
 from noteclaw_backend.settings import get_settings
@@ -70,7 +71,7 @@ class MultimodalQueryService:
                 str(saved_path),
                 parsed.metadata.get("ocr_text"),
             )
-            visual_description = str(vision.get("description", "")).strip() or None
+            visual_description = extract_vision_text(vision) or None
             metadata["vision"] = vision
 
         enhanced_query = self._compose_enhanced_query(
