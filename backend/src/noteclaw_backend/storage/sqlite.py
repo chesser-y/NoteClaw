@@ -46,10 +46,40 @@ create table if not exists feedback(
   created_at text not null
 );
 
+create table if not exists chat_sessions(
+  id text primary key,
+  title text not null,
+  scope_json text not null,
+  created_at text not null,
+  updated_at text not null
+);
+
+create table if not exists chat_messages(
+  id text primary key,
+  session_id text not null references chat_sessions(id) on delete cascade,
+  role text not null,
+  content text not null,
+  citations_json text not null,
+  trace_json text not null,
+  created_at text not null
+);
+
+create table if not exists review_items(
+  id text primary key,
+  type text not null,
+  payload_json text not null,
+  status text not null default 'pending',
+  created_at text not null,
+  resolved_at text
+);
+
 create index if not exists idx_chunks_note_id on chunks(note_id);
 create index if not exists idx_notes_content_type on notes(content_type);
 create index if not exists idx_notes_status on notes(status);
 create index if not exists idx_vector_mappings_row on vector_mappings(faiss_row_id);
+create index if not exists idx_chat_messages_session on chat_messages(session_id, created_at);
+create index if not exists idx_chat_sessions_updated on chat_sessions(updated_at desc);
+create index if not exists idx_review_items_status on review_items(status, created_at desc);
 """
 
 
@@ -70,3 +100,19 @@ class SQLiteStore:
     def init_schema(self) -> None:
         with self.connect() as conn:
             conn.executescript(SCHEMA_SQL)
+            self._ensure_column(conn, "notes", "is_favorite", "integer not null default 0")
+            self._ensure_column(conn, "chat_sessions", "is_favorite", "integer not null default 0")
+            conn.execute(
+                "create index if not exists idx_notes_favorite on notes(is_favorite, updated_at desc)"
+            )
+            conn.execute(
+                "create index if not exists idx_chat_sessions_favorite on chat_sessions(is_favorite, updated_at desc)"
+            )
+
+    @staticmethod
+    def _ensure_column(
+        conn: Connection, table: str, column: str, definition: str
+    ) -> None:
+        cols = {row[1] for row in conn.execute(f"pragma table_info({table})").fetchall()}
+        if column not in cols:
+            conn.execute(f"alter table {table} add column {column} {definition}")

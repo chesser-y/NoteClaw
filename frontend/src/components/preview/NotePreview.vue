@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { marked } from 'marked'
 import { X, Loader2, FileWarning, Download, ExternalLink } from 'lucide-vue-next'
 import { getKnowledge } from '../../api/knowledge'
 import { API_BASE } from '../../api/http'
 import type { NoteDetail } from '../../api/types'
+import MarkdownView from '../common/MarkdownView.vue'
 
 const props = defineProps<{ noteId: string | null }>()
 const emit = defineEmits<{ close: [] }>()
@@ -67,11 +67,7 @@ const contentKind = computed<'markdown' | 'code' | 'html' | 'image' | 'pdf' | 't
 const renderedMarkdown = computed(() => {
   if (!note.value) return ''
   if (contentKind.value !== 'markdown') return ''
-  try {
-    return marked.parse(note.value.content || '', { async: false }) as string
-  } catch {
-    return ''
-  }
+  return note.value.content || ''
 })
 
 const codeLanguage = computed(() => {
@@ -180,7 +176,9 @@ const tableRows = computed<string[][]>(() => {
               <pre v-else class="fallback-text">{{ note.content }}</pre>
             </div>
 
-            <article v-else-if="contentKind === 'markdown'" class="md-body" v-html="renderedMarkdown"></article>
+            <article v-else-if="contentKind === 'markdown'" class="md-body">
+              <MarkdownView :content="renderedMarkdown" />
+            </article>
 
             <pre v-else class="fallback-text">{{ note.content }}</pre>
           </template>

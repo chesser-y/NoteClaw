@@ -26,6 +26,19 @@
     "settings": "Settings",
     "quality": "Quality & Evaluation"
   },
+  "review": {
+    "tab-drafts": "Drafts",
+    "tab-low-conf": "Low-confidence",
+    "tab-duplicates": "Duplicates",
+    "approve": "Approve",
+    "reject": "Reject",
+    "defer": "Defer",
+    "resolve": "Resolve",
+    "run-duplicates": "Detect duplicates",
+    "empty": "All caught up ✨",
+    "empty-dup": "No duplicates found. Click \"Detect duplicates\" to scan.",
+    "duplicate-title": "Possible duplicate"
+  },
   "tabs": {
     "ask": "Ask",
     "browse": "Browse",
@@ -91,6 +104,16 @@
     "theme-light": "Light",
     "lang-zh": "中文",
     "lang-en": "English"
+  },
+  "favorites": {
+    "view-all": "View favorites",
+    "title": "Favorites",
+    "tab-notes": "Notes",
+    "tab-sessions": "Sessions",
+    "empty": "No favorites yet. Star a note in Library or a chat in Inbox to see it here.",
+    "empty-notes": "No favorite notes",
+    "empty-sessions": "No favorite sessions",
+    "open": "Open"
   },
   "palette": {
     "placeholder": "Search a command or ask…",
@@ -176,10 +199,14 @@
     "thinking-web": "NanoBot web research…",
     "no-conversation": "No conversation yet",
     "empty-chat": "Ask a question to start",
-    "recent": "Recent",
+    "recent": "Recent chats",
+    "recent-empty": "No conversations yet — ask your first question.",
     "recent-tasks": "Recent tasks",
     "open-history": "Open recent chats",
     "back-hero": "Back to home",
+    "new-chat": "New chat",
+    "delete-chat": "Delete",
+    "messages-suffix": " msgs",
     "suggestion-summarize": "Summarise my recent notes",
     "suggestion-related": "Find related notes",
     "suggestion-ppt": "Generate a PPT outline",

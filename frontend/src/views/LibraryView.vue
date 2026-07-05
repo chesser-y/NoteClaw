@@ -2,8 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Eye } from 'lucide-vue-next'
-import { listKnowledge } from '../api/knowledge'
+import { Eye, Star } from 'lucide-vue-next'
+import { listKnowledge, setNoteFavorite } from '../api/knowledge'
 import type { ContentType, NoteListItem } from '../api/types'
 import FilterPopover from '../components/library/FilterPopover.vue'
 import NotePreview from '../components/preview/NotePreview.vue'
@@ -113,6 +113,18 @@ const typeLabel = (t: ContentType) => {
 }
 
 const filteredItems = computed(() => items.value)
+
+async function toggleNoteFav(item: NoteListItem, ev: Event) {
+  ev.stopPropagation()
+  const next = !item.is_favorite
+  const before = item.is_favorite
+  item.is_favorite = next
+  try {
+    await setNoteFavorite(item.id, next)
+  } catch {
+    item.is_favorite = before
+  }
+}
 </script>
 
 <template>
@@ -188,6 +200,15 @@ const filteredItems = computed(() => items.value)
           </span>
           <span class="muted" style="font-size: 12px;">{{ item.source || 'manual' }}</span>
           <span class="date">{{ relativeTime(item.created_at) }}</span>
+          <button
+            class="icon-button star-btn"
+            :class="{ active: item.is_favorite }"
+            type="button"
+            :title="t('favorites.title')"
+            @click="toggleNoteFav(item, $event)"
+          >
+            <Star :size="13" :fill="item.is_favorite ? 'currentColor' : 'none'" />
+          </button>
         </div>
       </div>
     </div>
@@ -199,6 +220,14 @@ const filteredItems = computed(() => items.value)
           <span class="spacer"></span>
           <button class="btn btn-ghost" style="height: 28px; padding: 0 10px; font-size: 12px;" @click="openPreview">
             <Eye :size="13" /> Preview
+          </button>
+          <button
+            class="icon-button star-btn"
+            type="button"
+            :title="t('favorites.title')"
+            @click="toggleNoteFav(selected, $event)"
+          >
+            <Star :size="14" :fill="selected.is_favorite ? 'currentColor' : 'none'" />
           </button>
           <button class="icon-button" @click="selected = null">✕</button>
         </header>
@@ -250,5 +279,27 @@ const filteredItems = computed(() => items.value)
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+.star-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.issue-row:hover .star-btn,
+.star-btn.active {
+  opacity: 1;
+}
+.star-btn.active {
+  color: var(--orange, #f5a524);
+}
+.star-btn:hover {
+  background: var(--panel-3, rgba(0,0,0,0.06));
 }
 </style>

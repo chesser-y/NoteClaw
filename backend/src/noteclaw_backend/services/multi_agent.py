@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from collections.abc import Awaitable, Callable
 from typing import Any
 
 from noteclaw_backend.domain.enums import (
@@ -29,9 +28,6 @@ from noteclaw_backend.settings import get_settings
 from noteclaw_backend.schemas.common import new_id
 
 
-AgentProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
-
-
 class MultiAgentWorkflowService:
     """Evidence-grounded multi-agent workflow orchestrator for deep knowledge tasks."""
 
@@ -50,7 +46,8 @@ class MultiAgentWorkflowService:
     async def run(
         self,
         request: AgentWorkflowRequest,
-        on_progress: AgentProgressCallback | None = None,
+        *,
+        progress_cb=None,
     ) -> AgentWorkflowResponse:
         workflow_id = new_id("workflow")
         task_id: str | None = None
@@ -77,10 +74,18 @@ class MultiAgentWorkflowService:
             work_item_id = task_service._task_to_work_item.get(task.id)
             task_service.mark_running(task.id, "Coordinator planning agents")
 
+        async def _emit(role: str, phase: str, **extra):
+            if progress_cb is None:
+                return
+            try:
+                await progress_cb(role, phase, extra)
+            except Exception:
+                pass
+
         try:
-            await self._emit_progress(
-                on_progress,
-                stage="coordinator",
+            await _emit(
+                "coordinator",
+                "running",
                 message="Coordinator planning agents",
                 progress=0.08,
                 workflow_id=workflow_id,
@@ -98,20 +103,21 @@ class MultiAgentWorkflowService:
                     artifacts={"plan": plan},
                 )
             )
-            await self._emit_progress(
-                on_progress,
-                stage="coordinator",
+            await _emit(
+                "coordinator",
+                "done",
                 message="Coordinator produced a workflow plan",
                 progress=0.25,
                 workflow_id=workflow_id,
                 task_id=task_id,
                 plan=plan,
+                output="; ".join(plan[:4]),
             )
             self._update_task(task_id, 0.25, "Researcher collecting and structuring evidence")
 
-            await self._emit_progress(
-                on_progress,
-                stage="researcher",
+            await _emit(
+                "researcher",
+                "running",
                 message="Researcher collecting local and web evidence",
                 progress=0.34,
                 workflow_id=workflow_id,
@@ -136,6 +142,21 @@ class MultiAgentWorkflowService:
                     artifacts={"trace": research.trace, "claims": claims},
                 )
             )
+            await _emit(
+                "researcher",
+                "done",
+                message="Researcher structured evidence and citation-backed claims",
+                progress=0.58,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+                output=(
+                    f"{len(research.citations)} citations · "
+                    f"{len(research.web_sources)} web · "
+                    f"{len(claims)} claims"
+                ),
+                citations=[c.model_dump(mode="json") for c in research.citations[:6]],
+            )
             if work_item_id:
                 task_service.update_work_item(
                     work_item_id,
@@ -144,23 +165,11 @@ class MultiAgentWorkflowService:
                         metadata={"web_source_count": len(research.web_sources)},
                     ),
                 )
-            await self._emit_progress(
-                on_progress,
-                stage="researcher",
-                message="Researcher structured evidence and citation-backed claims",
-                progress=0.58,
-                workflow_id=workflow_id,
-                task_id=task_id,
-                plan=plan,
-                local_citation_count=len(research.citations),
-                web_source_count=len(research.web_sources),
-                evidence_anchor_count=len(research.evidence_anchors),
-            )
             self._update_task(task_id, 0.58, "Reasoner synthesizing final output")
 
-            await self._emit_progress(
-                on_progress,
-                stage="reasoner",
+            await _emit(
+                "reasoner",
+                "running",
                 message="Reasoner synthesizing final answer",
                 progress=0.68,
                 workflow_id=workflow_id,
@@ -180,20 +189,21 @@ class MultiAgentWorkflowService:
                     artifacts={"output_format": request.output_format, "synthesis": synthesis[:1200]},
                 )
             )
-            await self._emit_progress(
-                on_progress,
-                stage="reasoner",
+            await _emit(
+                "reasoner",
+                "done",
                 message="Reasoner produced a draft answer",
                 progress=0.86,
                 workflow_id=workflow_id,
                 task_id=task_id,
                 plan=plan,
+                output=final_answer[:360],
             )
             self._update_task(task_id, 0.86, "Reviewer checking citations and risks")
 
-            await self._emit_progress(
-                on_progress,
-                stage="reviewer",
+            await _emit(
+                "reviewer",
+                "running",
                 message="Reviewer checking citations and risks",
                 progress=0.92,
                 workflow_id=workflow_id,
@@ -211,14 +221,15 @@ class MultiAgentWorkflowService:
                     artifacts=review.model_dump(mode="json"),
                 )
             )
-            await self._emit_progress(
-                on_progress,
-                stage="reviewer",
+            await _emit(
+                "reviewer",
+                "done",
                 message="Reviewer finished quality check",
                 progress=0.98,
                 workflow_id=workflow_id,
                 task_id=task_id,
                 plan=plan,
+                output=f"{review.verdict} · confidence={review.confidence:.2f}",
                 review=review.model_dump(mode="json"),
             )
 
@@ -531,14 +542,6 @@ class MultiAgentWorkflowService:
                 progress=progress,
                 message=message,
             )
-
-    async def _emit_progress(
-        self,
-        callback: AgentProgressCallback | None,
-        **payload: Any,
-    ) -> None:
-        if callback is not None:
-            await callback(payload)
 
     def _clean_steps(self, raw_steps: list[str], limit: int) -> list[str]:
         seen: set[str] = set()

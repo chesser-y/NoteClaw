@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Sparkles, FileText, Presentation, StickyNote, Send, Loader2, ChevronDown, X, Check, Eye, Download, ExternalLink } from "lucide-vue-next"
-import { marked } from 'marked'
 import { previewGeneration, createGenerationTask } from '../api/generate'
 import { listTasks } from '../api/tasks'
 import { listKnowledge, getKnowledgeFacets, type Facets } from '../api/knowledge'
@@ -11,6 +10,7 @@ import { API_BASE } from '../api/http'
 import type { ContentType, GenerationType, NoteListItem, TaskRead, GenerationPreviewResponse } from '../api/types'
 import TemplateCard from '../components/studio/TemplateCard.vue'
 import NotePreview from '../components/preview/NotePreview.vue'
+import MarkdownView from '../components/common/MarkdownView.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -228,13 +228,7 @@ const previewMarkdown = computed(() => {
 })
 
 const previewHtml = computed(() => {
-  const md = previewMarkdown.value
-  if (!md) return ''
-  try {
-    return marked.parse(md) as string
-  } catch {
-    return ''
-  }
+  return previewMarkdown.value
 })
 
 const downloadUrl = computed(() => {
@@ -467,7 +461,9 @@ function sendAgent() {
                 <span class="slide-num">{{ i + 1 }}</span>
               </div>
             </div>
-            <div v-else class="preview-md" v-html="previewHtml"></div>
+            <div v-else class="preview-md">
+              <MarkdownView :content="previewHtml" />
+            </div>
           </div>
 
           <h3 style="margin: 0 0 12px; color: var(--text); font-size: 14px; font-weight: 700;">{{ t('studio.start-from-template') }}</h3>

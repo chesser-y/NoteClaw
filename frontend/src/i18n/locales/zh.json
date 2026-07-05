@@ -26,6 +26,19 @@
     "settings": "设置",
     "quality": "质量与评测"
   },
+  "review": {
+    "tab-drafts": "生成草稿",
+    "tab-low-conf": "低置信答案",
+    "tab-duplicates": "重复笔记",
+    "approve": "采纳",
+    "reject": "拒绝",
+    "defer": "稍后",
+    "resolve": "已处理",
+    "run-duplicates": "扫描重复",
+    "empty": "全部已处理 ✨",
+    "empty-dup": "暂无重复。点「扫描重复」开始检测。",
+    "duplicate-title": "疑似重复笔记"
+  },
   "tabs": {
     "ask": "提问",
     "browse": "浏览",
@@ -92,6 +105,16 @@
     "theme-light": "浅色",
     "lang-zh": "中文",
     "lang-en": "English"
+  },
+  "favorites": {
+    "view-all": "查看收藏",
+    "title": "收藏",
+    "tab-notes": "笔记",
+    "tab-sessions": "会话",
+    "empty": "还没有收藏。在 Library 或 Inbox 里点星标，会出现在这里。",
+    "empty-notes": "暂无收藏的笔记",
+    "empty-sessions": "暂无收藏的会话",
+    "open": "打开"
   },
   "palette": {
     "placeholder": "搜索命令或提问…",
@@ -177,10 +200,14 @@
     "thinking-web": "NanoBot 联网搜索中…",
     "no-conversation": "没有对话内容",
     "empty-chat": "提一个问题开始对话",
-    "recent": "最近",
+    "recent": "历史会话",
+    "recent-empty": "还没有会话——问第一个问题吧。",
     "recent-tasks": "最近任务",
     "open-history": "打开历史会话",
     "back-hero": "返回首页",
+    "new-chat": "新对话",
+    "delete-chat": "删除",
+    "messages-suffix": " 条",
     "suggestion-summarize": "总结最近保存的资料",
     "suggestion-related": "找出相关笔记",
     "suggestion-ppt": "生成 PPT 大纲",

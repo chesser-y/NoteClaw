@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { FileText, Image as ImageIcon, Code2, Table as TableIcon, Send, MoreHorizontal } from "lucide-vue-next"
+import { Send, MoreHorizontal, Plus, Trash2, MessageSquare, Star } from "lucide-vue-next"
 import { useUiStore } from '../stores/ui'
 import { useChatStore } from '../stores/chat'
 import { useIngest } from '../composables/useIngest'
 import { useHorizontalDrag } from '../composables/useDrag'
-import { listKnowledge } from '../api/knowledge'
-import { listTasks } from '../api/tasks'
-import type { NoteListItem, TaskRead } from '../api/types'
+import { listChatSessions, deleteChatSession, setSessionFavorite } from '../api/chat'
+import type { ChatSessionRead } from '../api/types'
 import SourcePreview from '../components/home/SourcePreview.vue'
 import UnderstandingPanel from '../components/home/UnderstandingPanel.vue'
 import HomeHero from '../components/home/HomeHero.vue'
 import AgentTracePanel from '../components/chat/AgentTracePanel.vue'
+import MarkdownView from '../components/common/MarkdownView.vue'
 
 const { t } = useI18n()
 
@@ -22,12 +22,11 @@ const ui = useUiStore()
 const chat = useChatStore()
 const ingest = useIngest()
 
-const splitWidth = useHorizontalDrag({ initial: 482, min: 320, max: 760, storageKey: 'noteclaw.inbox-split' })
+const splitWidth = useHorizontalDrag({ initial: 320, min: 260, max: 520, storageKey: 'noteclaw.inbox-split' })
 
 const mode = ref<Mode>('hero')
-const recent = ref<NoteListItem[]>([])
-const tasks = ref<TaskRead[]>([])
-const loadingRecent = ref(false)
+const sessions = ref<ChatSessionRead[]>([])
+const loadingSessions = ref(false)
 const draftsQuestion = ref('')
 const tab = ref<'ask' | 'browse'>('ask')
 
@@ -50,22 +49,20 @@ const chatThinking = computed(() => {
   return t('inbox.thinking-normal')
 })
 
-async function loadRecent() {
-  loadingRecent.value = true
+async function loadSessions() {
+  loadingSessions.value = true
   try {
-    const [k, t] = await Promise.allSettled([
-      listKnowledge({ limit: 8 }),
-      listTasks({ limit: 6 }),
-    ])
-    if (k.status === 'fulfilled') recent.value = k.value.items
-    if (t.status === 'fulfilled') tasks.value = t.value.items
+    sessions.value = await listChatSessions(50)
+  } catch (e) {
+    console.error('failed to load sessions', e)
+    sessions.value = []
   } finally {
-    loadingRecent.value = false
+    loadingSessions.value = false
   }
 }
 
 onMounted(() => {
-  loadRecent()
+  loadSessions()
   if (ui.askPrefill) {
     const q = ui.askPrefill
     ui.askPrefill = ''
@@ -79,6 +76,7 @@ async function submitQuestion(q?: string) {
   if (q) draftsQuestion.value = ''
   mode.value = 'split'
   await chat.ask(text)
+  await loadSessions()
 }
 
 async function submitInline() {
@@ -86,12 +84,42 @@ async function submitInline() {
   if (!text) return
   draftsQuestion.value = ''
   await chat.ask(text)
+  await loadSessions()
 }
 
 async function onHeroAsk(question: string) {
   draftsQuestion.value = ''
   mode.value = 'split'
   await chat.ask(question)
+  await loadSessions()
+}
+
+async function openSession(s: ChatSessionRead) {
+  mode.value = 'split'
+  await chat.loadSession(s.id)
+}
+
+async function removeSession(id: string, ev: Event) {
+  ev.stopPropagation()
+  try {
+    await deleteChatSession(id)
+    sessions.value = sessions.value.filter((s) => s.id !== id)
+    if (chat.sessionId === id) chat.reset()
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+async function toggleSessionFav(s: ChatSessionRead, ev: Event) {
+  ev.stopPropagation()
+  const next = !s.is_favorite
+  const before = s.is_favorite
+  s.is_favorite = next
+  try {
+    await setSessionFavorite(s.id, next)
+  } catch {
+    s.is_favorite = before
+  }
 }
 
 function focusChat() {
@@ -104,15 +132,13 @@ function backToHero() {
   chat.reset()
 }
 
-function onIngestAsk() {
-  ui.openAsk(null)
+function startNewChat() {
+  mode.value = 'hero'
+  chat.reset()
 }
 
-const iconFor = (t: string) => {
-  if (t === 'image') return ImageIcon
-  if (t === 'code') return Code2
-  if (t === 'table') return TableIcon
-  return FileText
+function onIngestAsk() {
+  ui.openAsk(null)
 }
 
 const relativeTime = (iso: string) => {
@@ -183,45 +209,49 @@ void hasConversation
       :style="{ gridTemplateColumns: splitWidth.size.value + 'px 4px 1fr' }"
     >
       <div class="inbox-list">
+        <div class="inbox-list-header">
+          <span class="section-title">{{ t('inbox.recent') }}</span>
+          <button class="icon-button new-chat-btn" type="button" :title="t('inbox.new-chat')" @click="startNewChat">
+            <Plus :size="14" />
+          </button>
+        </div>
         <div class="inbox-items">
-          <div class="section-title" style="font-size: 13px; padding: 6px 14px; color: #6f7480; font-weight: 700;">
-            {{ t('inbox.recent') }}
-          </div>
           <div
-            v-for="item in recent"
-            :key="item.id"
-            class="inbox-card"
-            style="cursor: pointer;"
-            @click="ui.openAsk({ noteIds: [item.id], title: item.title })"
+            v-for="s in sessions"
+            :key="s.id"
+            class="inbox-card session-card"
+            :class="{ active: chat.sessionId === s.id }"
+            @click="openSession(s)"
           >
-            <component :is="iconFor(item.content_type)" :size="16" style="color: #747983;" />
-            <div>
-              <strong>{{ item.title }}</strong>
-              <span class="sub">{{ (item.tags || []).slice(0, 2).join(' · ') || item.content_type }}</span>
+            <MessageSquare :size="14" class="session-icon" />
+            <div class="session-text">
+              <strong>{{ s.title || 'Untitled' }}</strong>
+              <span class="sub">
+                {{ (s.message_count ?? 0) + t('inbox.messages-suffix') }}
+                · {{ relativeTime(s.updated_at || s.created_at) }}
+              </span>
             </div>
-            <div class="time">{{ relativeTime(item.created_at) }}</div>
+            <button
+              class="icon-button session-star"
+              :class="{ active: s.is_favorite }"
+              type="button"
+              :title="t('favorites.title')"
+              @click="toggleSessionFav(s, $event)"
+            >
+              <Star :size="12" :fill="s.is_favorite ? 'currentColor' : 'none'" />
+            </button>
+            <button
+              class="icon-button session-delete"
+              type="button"
+              :title="t('inbox.delete-chat')"
+              @click="removeSession(s.id, $event)"
+            >
+              <Trash2 :size="12" />
+            </button>
           </div>
 
-          <div v-if="tasks.length" class="section-title" style="font-size: 13px; padding: 14px 14px 6px; color: #6f7480; font-weight: 700;">
-            {{ t('inbox.recent-tasks') }}
-          </div>
-          <div
-            v-for="t in tasks"
-            :key="t.id"
-            class="inbox-card"
-            style="cursor: pointer;"
-            @click="ui.openAsk({ noteIds: [], title: t.type })"
-          >
-            <span class="status-ring" :class="{ green: t.status === 'succeeded', gray: t.status === 'failed' }"></span>
-            <div>
-              <strong>{{ t.type }}</strong>
-              <span class="sub">{{ t.message || t.status }}</span>
-            </div>
-            <div class="time">{{ Math.round(t.progress * 100) }}%</div>
-          </div>
-
-          <div v-if="!recent.length && !tasks.length && !loadingRecent" class="placeholder" style="padding: 40px 16px; font-size: 13px;">
-            {{ t('empty.inbox-recent') }}
+          <div v-if="!sessions.length && !loadingSessions" class="placeholder" style="padding: 40px 16px; font-size: 13px; text-align: center;">
+            {{ t('inbox.recent-empty') }}
           </div>
         </div>
       </div>
@@ -249,11 +279,13 @@ void hasConversation
             <div class="avatar">{{ turn.role === 'user' ? 'U' : 'NC' }}</div>
             <div style="flex: 1; min-width: 0;">
               <div class="bubble" :class="{ muted: turn.pending && !turn.content }">
-                {{ turn.content || turn.status || (turn.pending ? chatThinking : '') }}
+                <MarkdownView v-if="turn.content" :content="turn.content" />
+                <span v-else>{{ turn.status || (turn.pending ? chatThinking : '') }}</span>
               </div>
               <AgentTracePanel
-                v-if="turn.role === 'assistant' && turn.trace?.steps?.length"
+                v-if="turn.role === 'assistant' && (turn.streaming || (((turn.trace?.metadata as any)?.steps?.length) ?? 0) > 0)"
                 :trace="turn.trace"
+                :live="!!turn.streaming && chat.sending && i === chat.turns.length - 1"
               />
               <div v-if="turn.citations && turn.citations.length" class="chat-citations">
                 <span
@@ -269,6 +301,10 @@ void hasConversation
           </div>
 
           <div v-if="chat.error" class="placeholder error">{{ chat.error }}</div>
+          <div v-if="chat.sending && (!chat.turns.length || chat.turns[chat.turns.length - 1]?.role !== 'assistant')" class="chat-msg assistant">
+            <div class="avatar">NC</div>
+            <div class="bubble muted">{{ chatThinking }}</div>
+          </div>
         </div>
 
         <div class="chat-input-bar">
@@ -309,11 +345,13 @@ void hasConversation
           <div class="avatar">{{ turn.role === 'user' ? 'U' : 'NC' }}</div>
           <div style="flex: 1; min-width: 0;">
             <div class="bubble" :class="{ muted: turn.pending && !turn.content }">
-              {{ turn.content || turn.status || (turn.pending ? chatThinking : '') }}
+              <MarkdownView v-if="turn.content" :content="turn.content" />
+              <span v-else>{{ turn.status || (turn.pending ? chatThinking : '') }}</span>
             </div>
             <AgentTracePanel
-              v-if="turn.role === 'assistant' && turn.trace?.steps?.length"
+              v-if="turn.role === 'assistant' && (turn.streaming || (((turn.trace?.metadata as any)?.steps?.length) ?? 0) > 0)"
               :trace="turn.trace"
+              :live="!!turn.streaming && chat.sending && i === chat.turns.length - 1"
             />
             <div v-if="turn.citations && turn.citations.length" class="chat-citations">
               <span
@@ -375,6 +413,94 @@ void hasConversation
 .tabs {
   display: flex;
   gap: 4px;
+}
+
+.inbox-list-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.inbox-list-header .section-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.new-chat-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.session-card {
+  cursor: pointer;
+  position: relative;
+}
+.session-card:hover .session-delete {
+  opacity: 1;
+}
+.session-card.active {
+  background: rgba(98, 107, 230, 0.14);
+}
+.session-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 3px;
+}
+.session-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.session-text strong {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-delete {
+  opacity: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: opacity 120ms ease;
+}
+.session-delete:hover {
+  background: rgba(232, 91, 134, 0.18);
+  color: var(--pink);
+}
+.session-star {
+  opacity: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--orange, #f5a524);
+  transition: opacity 120ms ease;
+}
+.session-card:hover .session-star {
+  opacity: 1;
+}
+.session-star.active {
+  opacity: 1;
+}
+.session-star:hover {
+  background: rgba(245, 165, 36, 0.18);
 }
 
 .mode-seg {

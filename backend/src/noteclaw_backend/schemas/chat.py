@@ -18,6 +18,27 @@ class ChatSessionRead(BaseModel):
     id: str
     title: str
     created_at: datetime
+    updated_at: datetime | None = None
+    message_count: int = 0
+    is_favorite: bool = False
+
+
+class ChatMessageRead(BaseModel):
+    id: str
+    role: str
+    content: str
+    citations: list[Citation] = Field(default_factory=list)
+    trace: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class ChatSessionDetail(ChatSessionRead):
+    scope: Scope = Field(default_factory=Scope)
+    messages: list[ChatMessageRead] = Field(default_factory=list)
+
+
+class ChatSessionPatch(BaseModel):
+    title: str | None = None
 
 
 class ChatMessageRequest(BaseModel):

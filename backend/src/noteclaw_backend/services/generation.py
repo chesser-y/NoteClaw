@@ -151,6 +151,7 @@ class GenerationService:
             "prompt": request.prompt[:400],
             "citation_count": len(citations),
             "citation_note_ids": [c.note_id for c in citations[:8]],
+            "review_status": "pending",
         }
         if stored_path is not None:
             metadata["stored_path"] = str(stored_path)
