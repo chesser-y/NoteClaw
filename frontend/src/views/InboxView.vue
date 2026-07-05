@@ -38,6 +38,18 @@ const prompts = computed(() => [
   t('inbox.suggestion-compare'),
 ])
 
+const chatPlaceholder = computed(() => {
+  if (chat.mode === 'agent') return t('inbox.ask-agent')
+  if (chat.mode === 'web') return t('inbox.ask-web')
+  return t('inbox.ask-normal')
+})
+
+const chatThinking = computed(() => {
+  if (chat.mode === 'agent') return t('inbox.thinking-agent')
+  if (chat.mode === 'web') return t('inbox.thinking-web')
+  return t('inbox.thinking-normal')
+})
+
 async function loadRecent() {
   loadingRecent.value = true
   try {
@@ -256,7 +268,7 @@ void hasConversation
 
           <div v-if="chat.sending" class="chat-msg assistant">
             <div class="avatar">NC</div>
-            <div class="bubble muted">{{ chat.mode === 'agent' ? t('inbox.thinking-agent') : t('inbox.thinking-normal') }}</div>
+            <div class="bubble muted">{{ chatThinking }}</div>
           </div>
         </div>
 
@@ -269,13 +281,18 @@ void hasConversation
             >Normal</button>
             <button
               type="button"
+              :class="{ active: chat.mode === 'web' }"
+              @click="chat.setMode('web')"
+            >NanoBot Web</button>
+            <button
+              type="button"
               :class="{ active: chat.mode === 'agent' }"
               @click="chat.setMode('agent')"
             >Agent</button>
           </div>
           <textarea
             v-model="draftsQuestion"
-            :placeholder="chat.mode === 'agent' ? t('inbox.ask-agent') : t('inbox.ask-normal')"
+            :placeholder="chatPlaceholder"
             @keydown.enter.meta.prevent="submitInline"
             @keydown.enter.ctrl.prevent="submitInline"
           ></textarea>
@@ -322,13 +339,18 @@ void hasConversation
           >Normal</button>
           <button
             type="button"
+            :class="{ active: chat.mode === 'web' }"
+            @click="chat.setMode('web')"
+          >NanoBot Web</button>
+          <button
+            type="button"
             :class="{ active: chat.mode === 'agent' }"
             @click="chat.setMode('agent')"
           >Agent</button>
         </div>
         <textarea
           v-model="draftsQuestion"
-          :placeholder="chat.mode === 'agent' ? t('inbox.ask-agent') : t('inbox.ask-normal')"
+          :placeholder="chatPlaceholder"
           @keydown.enter.meta.prevent="submitInline"
           @keydown.enter.ctrl.prevent="submitInline"
         ></textarea>
@@ -368,6 +390,7 @@ void hasConversation
   font-size: 11px;
   padding: 4px 10px;
   border-radius: 5px;
+  white-space: nowrap;
   cursor: pointer;
   font-weight: 500;
 }

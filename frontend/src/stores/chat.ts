@@ -36,12 +36,18 @@ export const useChatStore = defineStore('chat', () => {
         const session = await createChatSession({ scope: scope.value ?? undefined })
         sessionId.value = session.id
       }
+      const currentMode = mode.value
+      const useWeb = currentMode === 'web' || currentMode === 'agent'
       const res = await sendChatMessage(sessionId.value!, {
         message: question,
         retrieval_mode: 'hybrid',
-        use_nanobot_reasoning: false,
-        reasoning_mode: mode.value,
+        use_nanobot_reasoning: currentMode === 'deep',
+        use_web_research: useWeb,
+        reasoning_mode: currentMode,
         top_k: 8,
+        max_reasoning_steps: currentMode === 'normal' ? 3 : 4,
+        web_results: 4,
+        fetch_web_pages: useWeb,
       })
       turns.value.push({
         role: 'assistant',

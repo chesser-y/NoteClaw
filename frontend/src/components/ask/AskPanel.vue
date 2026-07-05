@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { MessageSquareText, Send } from 'lucide-vue-next'
+import { Globe2, MessageSquareText, Send } from 'lucide-vue-next'
 import { useUiStore } from '../../stores/ui'
 import { createChatSession, sendChatMessage } from '../../api/chat'
 import type { ChatMessageResponse } from '../../api/types'
@@ -25,6 +25,7 @@ const input = ref(ui.askPrefill || '')
 const sending = ref(false)
 const error = ref('')
 const last = ref<ChatMessageResponse | null>(null)
+const useWeb = ref(false)
 
 watch(
   () => ui.askPrefill,
@@ -56,8 +57,13 @@ async function submit() {
     const res = await sendChatMessage(session.id, {
       message,
       retrieval_mode: 'hybrid',
+      reasoning_mode: useWeb.value ? 'web' : 'normal',
       use_nanobot_reasoning: false,
+      use_web_research: useWeb.value,
       top_k: 6,
+      max_reasoning_steps: useWeb.value ? 4 : 3,
+      web_results: 4,
+      fetch_web_pages: useWeb.value,
     })
     last.value = res
     input.value = ''
@@ -75,6 +81,19 @@ async function submit() {
       <p class="text-sm text-[#929399]">
         你可以问<span class="font-medium text-[#626be6]">{{ scopeLabel }}</span>，也可以问全部资料。
       </p>
+
+      <div class="flex items-center justify-between rounded-lg border border-[#24262a] bg-[#151618] px-3 py-2">
+        <button
+          class="btn h-8 px-3 text-xs"
+          :class="{ 'btn-primary': useWeb, 'btn-ghost': !useWeb }"
+          type="button"
+          @click="useWeb = !useWeb"
+        >
+          <Globe2 :size="14" />
+          {{ useWeb ? 'NanoBot 联网已开' : 'NanoBot 联网' }}
+        </button>
+        <span class="text-xs text-[#73747a]">{{ useWeb ? '知识库 + 网页' : '仅知识库' }}</span>
+      </div>
 
       <form
         class="flex items-center gap-2 rounded-xl border border-[#24262a] bg-[#151618] px-3 py-2 focus-within:border-[#626be6] focus-within:shadow-[0_0_0_3px_rgba(98,107,230,0.22)]"
