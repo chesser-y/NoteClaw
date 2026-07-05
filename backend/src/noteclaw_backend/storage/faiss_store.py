@@ -48,7 +48,9 @@ class FaissVectorStore:
                 self.index = faiss.IndexFlatIP(matrix.shape[1])
             if self.index.d != matrix.shape[1]:
                 raise ValueError(
-                    f"embedding dimension changed from {self.index.d} to {matrix.shape[1]}"
+                    f"embedding dimension changed from {self.index.d} to {matrix.shape[1]}. "
+                    "The existing FAISS index was built with a different embedding provider/model. "
+                    "Keep one embedding model per storage directory, or rebuild the vector index."
                 )
             self.index.add(matrix)
         else:
@@ -64,6 +66,11 @@ class FaissVectorStore:
         candidates = min(len(self.chunk_ids), max(limit * 4, limit))
         hits: list[VectorHit] = []
         if faiss is not None and self.index is not None and self.index.ntotal > 0:
+            if self.index.d != query.shape[1]:
+                raise ValueError(
+                    f"query embedding dimension {query.shape[1]} does not match FAISS index dimension {self.index.d}. "
+                    "Use the same embedding model used to build the index, or rebuild the vector index."
+                )
             scores, row_ids = self.index.search(query, candidates)
             for score, row_id in zip(scores[0], row_ids[0]):
                 if row_id < 0 or row_id >= len(self.chunk_ids):

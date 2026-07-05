@@ -57,8 +57,42 @@ def _dt(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
+KEYWORD_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "based",
+    "be",
+    "before",
+    "by",
+    "can",
+    "does",
+    "for",
+    "from",
+    "has",
+    "how",
+    "in",
+    "into",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "what",
+    "which",
+    "with",
+}
+
+
 def _terms(text: str) -> list[str]:
-    return [term.lower() for term in re.findall(r"[A-Za-z0-9_\-]+|[\u4e00-\u9fff]+", text)]
+    terms = [term.lower() for term in re.findall(r"[A-Za-z0-9_\-]+|[\u4e00-\u9fff]+", text)]
+    filtered = [term for term in terms if term not in KEYWORD_STOPWORDS and len(term) > 1]
+    return filtered or terms
 
 
 def _snippet(text: str, query: str, size: int = 220) -> str:
@@ -286,22 +320,25 @@ class SQLiteKnowledgeRepository:
             if not self._row_matches_filters(row, filters):
                 continue
             tags_text = " ".join(_load(row["tags_json"], []))
-            haystack = "\n".join(
-                [
-                    row["title"],
-                    row["text"],
-                    row["summary"] or "",
-                    tags_text,
-                    row["source"] or "",
-                    row["source_url"] or "",
-                ]
-            ).lower()
+            title_text = row["title"].lower()
+            body_text = row["text"].lower()
+            summary_text = (row["summary"] or "").lower()
+            metadata_text = "\n".join([tags_text, row["source"] or "", row["source_url"] or ""]).lower()
+            haystack = "\n".join([title_text, body_text, summary_text, metadata_text])
             phrase_hits = haystack.count(query_lower) if query_lower else 0
-            term_hits = sum(haystack.count(term) for term in terms)
-            if phrase_hits == 0 and term_hits == 0:
+            term_score = 0.0
+            for term in dict.fromkeys(terms):
+                if term in title_text:
+                    term_score += 4.0
+                if term in metadata_text:
+                    term_score += 3.0
+                if term in summary_text:
+                    term_score += 2.0
+                term_score += min(body_text.count(term), 3) * 1.0
+            if phrase_hits == 0 and term_score == 0:
                 continue
             item = self._chunk_search_row(row)
-            item["score"] = float(phrase_hits * 3 + term_hits)
+            item["score"] = float(phrase_hits * 8 + term_score)
             item["snippet"] = _snippet(row["text"], query)
             scored.append(item)
         scored.sort(key=lambda item: item["score"], reverse=True)

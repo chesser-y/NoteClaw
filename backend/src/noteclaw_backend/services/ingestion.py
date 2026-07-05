@@ -167,15 +167,22 @@ class IngestionService:
             created_at=now,
             updated_at=now,
         )
-        repository = get_repository()
-        await repository.create_note(note)
+        chunk_ids = [chunk.id for chunk in chunks]
         embeddings = await get_embedding_provider().embed_texts([chunk.text for chunk in chunks])
-        row_ids = get_vector_store().add(embeddings, [chunk.id for chunk in chunks])
-        await repository.upsert_vector_mappings(
-            [chunk.id for chunk in chunks],
-            row_ids,
-            get_settings().embedding_model or "hashing-local",
-        )
+        repository = get_repository()
+        vector_store = get_vector_store()
+        await repository.create_note(note)
+        try:
+            row_ids = vector_store.add(embeddings, chunk_ids)
+            await repository.upsert_vector_mappings(
+                chunk_ids,
+                row_ids,
+                get_settings().embedding_model or "hashing-local",
+            )
+        except Exception:
+            vector_store.mark_deleted(chunk_ids)
+            await repository.delete_note(note_id)
+            raise
 
     def _save_upload(self, note_id: str, filename: str, data: bytes) -> Path:
         safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(filename).name) or "upload.bin"

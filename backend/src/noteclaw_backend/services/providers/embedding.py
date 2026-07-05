@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 import hashlib
 import re
 from typing import Protocol
@@ -46,14 +47,48 @@ class HashingEmbeddingProvider:
 
 
 class ResilientEmbeddingProvider:
-    def __init__(self, primary: EmbeddingProvider | None, fallback: EmbeddingProvider) -> None:
+    def __init__(self, primary: EmbeddingProvider | None, fallback: EmbeddingProvider, cache_size: int = 2048) -> None:
         self.primary = primary
         self.fallback = fallback
+        self.cache_size = cache_size
+        self._cache: OrderedDict[str, list[float]] = OrderedDict()
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+
+        results: list[list[float] | None] = [None] * len(texts)
+        missing_texts: list[str] = []
+        missing_indexes: list[int] = []
+        for index, text in enumerate(texts):
+            cached = self._cache.get(text)
+            if cached is not None:
+                self._cache.move_to_end(text)
+                results[index] = list(cached)
+                continue
+            missing_indexes.append(index)
+            missing_texts.append(text)
+
+        if missing_texts:
+            vectors = await self._embed_uncached(missing_texts)
+            for index, text, vector in zip(missing_indexes, missing_texts, vectors):
+                clean_vector = list(vector)
+                results[index] = clean_vector
+                self._cache[text] = clean_vector
+                self._cache.move_to_end(text)
+            while len(self._cache) > self.cache_size:
+                self._cache.popitem(last=False)
+
+        return [vector if vector is not None else [] for vector in results]
+
+    async def _embed_uncached(self, texts: list[str]) -> list[list[float]]:
         if self.primary is not None:
             try:
                 return await self.primary.embed_texts(texts)
-            except Exception:
-                pass
+            except Exception as exc:
+                raise RuntimeError(
+                    "Embedding API failed; refusing to fall back to local hashing embeddings because "
+                    "that would mix vector spaces/dimensions in the same FAISS index. Check the "
+                    "embedding API key/base URL/model, or rebuild the vector index with one embedding model."
+                ) from exc
         return await self.fallback.embed_texts(texts)
