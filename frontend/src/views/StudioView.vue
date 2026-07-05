@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Sparkles, FileText, Presentation, StickyNote, Send, Loader2, ChevronDown, X, Check, Eye, Download, ExternalLink } from "lucide-vue-next"
+import { Sparkles, FileText, Presentation, StickyNote, Send, Loader2, ChevronDown, X, Check, Eye, Download, ExternalLink, Image as ImageIcon, Copy } from 'lucide-vue-next'
 import { previewGeneration, createGenerationTask } from '../api/generate'
 import { listTasks } from '../api/tasks'
 import { listKnowledge, getKnowledgeFacets, type Facets } from '../api/knowledge'
@@ -16,12 +16,13 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-type TemplateId = 'brief' | 'notes' | 'slides'
+type TemplateId = 'brief' | 'notes' | 'slides' | 'image'
 
 const templates = computed<{ id: TemplateId; label: string; sub: string; icon: typeof FileText; type: GenerationType; promptHint: string }[]>(() => [
   { id: 'brief', label: t('studio.tpl-brief-label'), sub: t('studio.tpl-brief-sub'), icon: FileText, type: 'report_draft', promptHint: t('studio.tpl-brief-hint') },
   { id: 'notes', label: t('studio.tpl-notes-label'), sub: t('studio.tpl-notes-sub'), icon: StickyNote, type: 'learning_note', promptHint: t('studio.tpl-notes-hint') },
   { id: 'slides', label: t('studio.tpl-slides-label'), sub: t('studio.tpl-slides-sub'), icon: Presentation, type: 'ppt_outline', promptHint: t('studio.tpl-slides-hint') },
+  { id: 'image', label: t('studio.tpl-image-label'), sub: t('studio.tpl-image-sub'), icon: ImageIcon, type: 'image', promptHint: t('studio.tpl-image-hint') },
 ])
 
 const prompt = ref((route.query.prompt as string) || '')
@@ -32,6 +33,9 @@ const preview = ref<GenerationPreviewResponse | null>(null)
 const recentTasks = ref<TaskRead[]>([])
 const recentNotes = ref<NoteListItem[]>([])
 const agentInput = ref('')
+const imageSize = ref('1024x1024')
+const imageGrounded = ref(false)
+const copiedImagePrompt = ref(false)
 
 // Scope picker state
 const scopeTags = ref<string[]>([])
@@ -102,6 +106,7 @@ const scopeActiveCount = computed(() => scopeTags.value.length + scopeTypes.valu
 
 const detectedType = computed<GenerationType>(() => {
   const p = prompt.value.toLowerCase()
+  if (/(图片|图像|插画|海报|封面|壁纸|image|illustration|poster|cover|wallpaper)/.test(p)) return 'image'
   if (/(表格|table)/.test(p)) return 'table'
   if (/(图示|diagram|流程)/.test(p)) return 'diagram'
   if (/(视频脚本|video script)/.test(p)) return 'video_script'
@@ -128,6 +133,7 @@ function selectTemplate(id: TemplateId) {
   activeTemplate.value = id
   const tpl = templates.value.find((tt) => tt.id === id)
   if (tpl) prompt.value = tpl.promptHint
+  if (id === 'image') imageGrounded.value = false
 }
 
 function buildScope() {
@@ -146,11 +152,21 @@ async function submit(asyncMode: boolean) {
   try {
     const genType = detectedType.value
     const scope = buildScope()
+    const options =
+      genType === 'image'
+        ? {
+            extra: {
+              size: imageSize.value,
+              ground_with_retrieval: imageGrounded.value,
+            },
+          }
+        : undefined
     if (asyncMode) {
       const res = await createGenerationTask({
         generation_type: genType,
         prompt: prompt.value,
         scope,
+        options,
       })
       await router.push(`/tasks?task=${res.task_id}`)
     } else {
@@ -158,6 +174,7 @@ async function submit(asyncMode: boolean) {
         generation_type: genType,
         prompt: prompt.value,
         scope,
+        options,
       })
       // Refresh recent so the persisted note shows up
       await loadRecent()
@@ -172,18 +189,17 @@ async function submit(asyncMode: boolean) {
 watch(
   () => route.query.template,
   (t) => {
-    if (t === 'brief' || t === 'notes' || t === 'slides') selectTemplate(t)
+    if (t === 'brief' || t === 'notes' || t === 'slides' || t === 'image') selectTemplate(t)
   },
 )
 
 onMounted(() => {
   loadRecent()
   const t = route.query.template as string | undefined
-  if (t === 'brief' || t === 'notes' || t === 'slides') selectTemplate(t)
+  if (t === 'brief' || t === 'notes' || t === 'slides' || t === 'image') selectTemplate(t)
   document.addEventListener('mousedown', onClickOutside)
 })
 
-import { onUnmounted } from 'vue'
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 
 const previewMarkdown = computed(() => {
@@ -230,6 +246,31 @@ const previewMarkdown = computed(() => {
 const previewHtml = computed(() => {
   return previewMarkdown.value
 })
+
+const imagePreview = computed(() => {
+  if (!preview.value || preview.value.generation_type !== 'image') return null
+  const content = preview.value.content
+  const obj = typeof content === 'object' && content ? content as Record<string, unknown> : {}
+  return {
+    url: typeof obj.url === 'string' ? obj.url : '',
+    prompt: typeof obj.prompt === 'string' ? obj.prompt : '',
+    status: typeof obj.status === 'string' ? obj.status : '',
+    size: typeof obj.size === 'string' ? obj.size : '',
+    note: typeof obj.note === 'string' ? obj.note : '',
+    grounded: Boolean(obj.grounded_with_retrieval),
+    anchorCount: typeof obj.anchor_count === 'number' ? obj.anchor_count : 0,
+  }
+})
+
+const previewActionLabel = computed(() =>
+  detectedType.value === 'image' ? t('studio.image-preview-action') : t('studio.preview'),
+)
+
+const generateActionLabel = computed(() =>
+  detectedType.value === 'image' ? t('studio.image-generate-action') : t('studio.generate'),
+)
+
+const sideModelLabel = computed(() => detectedType.value === 'image' ? 'gpt-image-1' : 'gpt-4o')
 
 const downloadUrl = computed(() => {
   if (!preview.value?.note_id) return ''
@@ -292,6 +333,20 @@ function sendAgent() {
   prompt.value = agentInput.value
   agentInput.value = ''
   submit(false)
+}
+
+async function copyImagePrompt() {
+  const text = imagePreview.value?.prompt
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedImagePrompt.value = true
+    window.setTimeout(() => {
+      copiedImagePrompt.value = false
+    }, 1400)
+  } catch {
+    copiedImagePrompt.value = false
+  }
 }
 </script>
 
@@ -410,13 +465,37 @@ function sendAgent() {
               <div style="display: flex; gap: 8px;">
                 <button class="btn" type="button" :disabled="sending || !prompt.trim()" @click="submit(false)">
                   <Loader2 v-if="sending" :size="14" class="animate-spin" />
-                  {{ t('studio.preview') }}
+                  {{ previewActionLabel }}
                 </button>
                 <button class="btn btn-primary" type="button" :disabled="sending || !prompt.trim()" @click="submit(true)">
                   <Send :size="14" />
-                  {{ t('studio.generate') }}
+                  {{ generateActionLabel }}
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div v-if="detectedType === 'image'" class="image-controls surface">
+            <div class="image-control-main">
+              <ImageIcon :size="15" />
+              <div>
+                <strong>{{ t('studio.image-controls-title') }}</strong>
+                <span>{{ t('studio.image-controls-sub') }}</span>
+              </div>
+            </div>
+            <div class="image-control-actions">
+              <label class="image-size-select">
+                <span>{{ t('studio.image-size') }}</span>
+                <select v-model="imageSize" class="field">
+                  <option value="1024x1024">1024 x 1024</option>
+                  <option value="1024x1536">1024 x 1536</option>
+                  <option value="1536x1024">1536 x 1024</option>
+                </select>
+              </label>
+              <label class="image-ground-toggle">
+                <input v-model="imageGrounded" type="checkbox" />
+                <span>{{ t('studio.image-grounded') }}</span>
+              </label>
             </div>
           </div>
 
@@ -450,7 +529,36 @@ function sendAgent() {
                 {{ downloadLabel }}
               </a>
             </div>
-            <div v-if="htmlSlides.length" class="slide-strip">
+            <div v-if="imagePreview" class="image-preview-panel">
+              <div v-if="imagePreview.url" class="generated-image-frame">
+                <img :src="imagePreview.url" :alt="imagePreview.prompt || prompt" />
+              </div>
+              <div v-else class="image-prompt-card">
+                <ImageIcon :size="20" />
+                <div>
+                  <strong>{{ t('studio.image-prompt-ready') }}</strong>
+                  <p>{{ imagePreview.note || t('studio.image-provider-missing') }}</p>
+                </div>
+              </div>
+              <div class="image-preview-meta">
+                <span class="pill square">{{ imagePreview.status || 'image' }}</span>
+                <span v-if="imagePreview.size" class="pill square">{{ imagePreview.size }}</span>
+                <span v-if="imagePreview.grounded" class="pill square">
+                  {{ t('studio.image-grounded-used', { n: imagePreview.anchorCount }) }}
+                </span>
+              </div>
+              <div v-if="imagePreview.prompt" class="image-prompt-box">
+                <div class="image-prompt-head">
+                  <span>{{ t('studio.image-final-prompt') }}</span>
+                  <button class="btn btn-ghost btn-mini" type="button" @click="copyImagePrompt">
+                    <Copy :size="12" />
+                    {{ copiedImagePrompt ? t('studio.image-copied') : t('studio.image-copy-prompt') }}
+                  </button>
+                </div>
+                <pre>{{ imagePreview.prompt }}</pre>
+              </div>
+            </div>
+            <div v-else-if="htmlSlides.length" class="slide-strip">
               <div
                 v-for="(html, i) in htmlSlides"
                 :key="i"
@@ -467,7 +575,7 @@ function sendAgent() {
           </div>
 
           <h3 style="margin: 0 0 12px; color: var(--text); font-size: 14px; font-weight: 700;">{{ t('studio.start-from-template') }}</h3>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 22px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px;">
             <TemplateCard
               v-for="tpl in templates"
               :key="tpl.id"
@@ -522,7 +630,7 @@ function sendAgent() {
           </div>
           <div class="side-row">
             <span class="label">{{ t('studio.side-model') }}</span>
-            <span class="mono">gpt-4o</span>
+            <span class="mono">{{ sideModelLabel }}</span>
           </div>
           <div class="side-row">
             <span class="label">{{ t('studio.side-owner') }}</span>
@@ -828,6 +936,172 @@ function sendAgent() {
   font-size: 12px;
 }
 
+.image-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin: -2px 0 16px;
+}
+.image-control-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+.image-control-main svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--blue);
+}
+.image-control-main strong,
+.image-control-main span {
+  display: block;
+}
+.image-control-main strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.image-control-main span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.image-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.image-size-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.image-size-select select {
+  width: 136px;
+  height: 30px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0 8px;
+  font-size: 12px;
+}
+.image-ground-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.image-ground-toggle input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+.image-preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.generated-image-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  max-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    var(--panel-2);
+  background-size: 20px 20px;
+}
+.generated-image-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+}
+.image-prompt-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(74, 174, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(74, 174, 255, 0.08);
+}
+.image-prompt-card svg {
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+.image-prompt-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+.image-prompt-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.image-preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.image-prompt-box {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.image-prompt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.image-prompt-box pre {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .slide-strip {
   display: flex;
   gap: 12px;
@@ -992,5 +1266,26 @@ function sendAgent() {
   padding-left: 10px;
   color: var(--muted);
   margin: 8px 0;
+}
+
+@media (max-width: 720px) {
+  .image-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .image-control-actions {
+    justify-content: flex-start;
+  }
+  .image-size-select {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .image-size-select select {
+    flex: 0 0 150px;
+  }
+  .image-prompt-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>
