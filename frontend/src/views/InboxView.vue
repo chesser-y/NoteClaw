@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Send, MoreHorizontal, Plus, Trash2, MessageSquare, Star } from "lucide-vue-next"
+import { Send, MoreHorizontal, Plus, Trash2, MessageSquare, Star, X } from "lucide-vue-next"
 import { useUiStore } from '../stores/ui'
 import { useChatStore } from '../stores/chat'
 import { useIngest } from '../composables/useIngest'
@@ -29,6 +29,16 @@ const sessions = ref<ChatSessionRead[]>([])
 const loadingSessions = ref(false)
 const draftsQuestion = ref('')
 const tab = ref<'ask' | 'browse'>('ask')
+
+const MOBILE_BREAKPOINT = 920
+const isMobile = ref(false)
+const mobileSessionsOpen = ref(false)
+
+let mql: MediaQueryList | null = null
+function onMqlChange() {
+  isMobile.value = window.innerWidth <= MOBILE_BREAKPOINT
+  if (!isMobile.value) mobileSessionsOpen.value = false
+}
 
 const prompts = computed(() => [
   t('inbox.suggestion-summarize'),
@@ -62,6 +72,9 @@ async function loadSessions() {
 }
 
 onMounted(() => {
+  mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
+  isMobile.value = mql.matches
+  mql.addEventListener('change', onMqlChange)
   loadSessions()
   if (ui.askPrefill) {
     const q = ui.askPrefill
@@ -70,11 +83,15 @@ onMounted(() => {
   }
 })
 
+onUnmounted(() => {
+  mql?.removeEventListener('change', onMqlChange)
+})
+
 async function submitQuestion(q?: string) {
   const text = (q ?? draftsQuestion.value).trim()
   if (!text) return
   if (q) draftsQuestion.value = ''
-  mode.value = 'split'
+  mode.value = isMobile.value ? 'chat' : 'split'
   await chat.ask(text)
   await loadSessions()
 }
@@ -83,19 +100,25 @@ async function submitInline() {
   const text = draftsQuestion.value.trim()
   if (!text) return
   draftsQuestion.value = ''
+  if (mode.value === 'hero') mode.value = isMobile.value ? 'chat' : 'split'
   await chat.ask(text)
   await loadSessions()
 }
 
 async function onHeroAsk(question: string) {
   draftsQuestion.value = ''
-  mode.value = 'split'
+  mode.value = isMobile.value ? 'chat' : 'split'
   await chat.ask(question)
   await loadSessions()
 }
 
 async function openSession(s: ChatSessionRead) {
-  mode.value = 'split'
+  if (isMobile.value) {
+    mobileSessionsOpen.value = false
+    mode.value = 'chat'
+  } else {
+    mode.value = 'split'
+  }
   await chat.loadSession(s.id)
 }
 
@@ -137,6 +160,16 @@ function startNewChat() {
   chat.reset()
 }
 
+function toggleHistory() {
+  if (isMobile.value) {
+    mobileSessionsOpen.value = !mobileSessionsOpen.value
+  } else if (mode.value === 'hero') {
+    mode.value = 'split'
+  } else {
+    backToHero()
+  }
+}
+
 function onIngestAsk() {
   ui.openAsk(null)
 }
@@ -161,9 +194,9 @@ void hasConversation
       <button
         class="icon-button"
         type="button"
-        :aria-pressed="mode !== 'hero'"
-        :title="mode === 'hero' ? t('inbox.open-history') : t('inbox.back-hero')"
-        @click="mode === 'hero' ? (mode = 'split') : backToHero()"
+        :aria-pressed="mode !== 'hero' || mobileSessionsOpen"
+        :title="t('inbox.open-history')"
+        @click="toggleHistory"
       >
         <MoreHorizontal :size="16" />
       </button>
@@ -171,7 +204,7 @@ void hasConversation
       <div class="tabs" v-if="mode !== 'hero'">
         <button class="tab" :class="{ active: tab === 'ask' }" @click="tab = 'ask'">{{ t('tabs.ask') }}</button>
         <button class="tab" :class="{ active: tab === 'browse' }" @click="tab = 'browse'">{{ t('tabs.browse') }}</button>
-        <button class="tab" @click="focusChat">{{ mode === 'chat' ? t('tabs.split') : t('tabs.focus') }}</button>
+        <button v-if="!isMobile" class="tab" @click="focusChat">{{ mode === 'chat' ? t('tabs.split') : t('tabs.focus') }}</button>
         <button class="tab" @click="backToHero">{{ t('tabs.new') }}</button>
       </div>
     </header>
@@ -202,11 +235,11 @@ void hasConversation
       </div>
     </div>
 
-    <!-- SPLIT MODE -->
+    <!-- SPLIT MODE (desktop only — on mobile we use 'chat' mode + drawer) -->
     <div
       v-else-if="mode === 'split'"
       class="inbox-layout"
-      :style="{ gridTemplateColumns: splitWidth.size.value + 'px 4px 1fr' }"
+      :style="isMobile ? {} : { gridTemplateColumns: splitWidth.size.value + 'px 4px 1fr' }"
     >
       <div class="inbox-list">
         <div class="inbox-list-header">
@@ -256,7 +289,7 @@ void hasConversation
         </div>
       </div>
 
-      <div class="split-handle" @mousedown="splitWidth.start"></div>
+      <div v-if="!isMobile" class="split-handle" @mousedown="splitWidth.start"></div>
 
       <div class="chat-panel">
         <div class="chat-messages">
@@ -399,6 +432,63 @@ void hasConversation
         </button>
       </div>
     </div>
+
+    <!-- MOBILE SESSION DRAWER -->
+    <Teleport to="body">
+      <div v-if="isMobile && mobileSessionsOpen" class="mobile-sessions-backdrop" @click="mobileSessionsOpen = false">
+        <div class="mobile-sessions-panel" @click.stop>
+          <header class="mobile-sessions-header">
+            <span class="section-title">{{ t('inbox.recent') }}</span>
+            <button class="icon-button" type="button" :title="t('action.close')" @click="mobileSessionsOpen = false">
+              <X :size="16" />
+            </button>
+          </header>
+          <button class="btn btn-ghost mobile-new-chat" type="button" @click="() => { startNewChat(); mobileSessionsOpen = false }">
+            <Plus :size="14" />
+            {{ t('inbox.new-chat') }}
+          </button>
+          <div class="inbox-items">
+            <div
+              v-for="s in sessions"
+              :key="s.id"
+              class="inbox-card session-card"
+              :class="{ active: chat.sessionId === s.id }"
+              @click="openSession(s)"
+            >
+              <MessageSquare :size="14" class="session-icon" />
+              <div class="session-text">
+                <strong>{{ s.title || 'Untitled' }}</strong>
+                <span class="sub">
+                  {{ (s.message_count ?? 0) + t('inbox.messages-suffix') }}
+                  · {{ relativeTime(s.updated_at || s.created_at) }}
+                </span>
+              </div>
+              <button
+                class="icon-button session-star"
+                :class="{ active: s.is_favorite }"
+                type="button"
+                :title="t('favorites.title')"
+                @click="toggleSessionFav(s, $event)"
+              >
+                <Star :size="12" :fill="s.is_favorite ? 'currentColor' : 'none'" />
+              </button>
+              <button
+                class="icon-button session-delete"
+                type="button"
+                :title="t('inbox.delete-chat')"
+                @click="removeSession(s.id, $event)"
+              >
+                <Trash2 :size="12" />
+              </button>
+            </div>
+
+            <div v-if="!sessions.length && !loadingSessions" class="placeholder" style="padding: 40px 16px; font-size: 13px; text-align: center;">
+              {{ t('inbox.recent-empty') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -528,5 +618,48 @@ void hasConversation
 }
 .mode-seg button:hover:not(.active) {
   color: var(--text);
+}
+
+.mobile-sessions-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: flex-start;
+}
+.mobile-sessions-panel {
+  width: min(86vw, 360px);
+  height: 100%;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.mobile-sessions-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.mobile-sessions-header .section-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.mobile-new-chat {
+  margin: 12px 14px 4px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  gap: 6px;
+  justify-content: flex-start;
 }
 </style>
