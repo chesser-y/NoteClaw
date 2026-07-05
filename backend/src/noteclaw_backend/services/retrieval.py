@@ -94,16 +94,21 @@ class RetrievalService:
         merged: dict[str, dict] = {}
         scores: dict[str, float] = {}
         max_keyword = max((float(row.get("score") or 0) for row in keyword_rows), default=1.0) or 1.0
+        has_keyword_match = False
         for rank, row in enumerate(keyword_rows):
             if not self._matches_scope(row, scope):
                 continue
+            has_keyword_match = True
             key = row["chunk_id"]
             merged[key] = row
             scores[key] = scores.get(key, 0.0) + 0.45 * (float(row.get("score") or 0) / max_keyword) + 0.15 / (rank + 1)
         for rank, row in enumerate(semantic_rows):
+            semantic_score = float(row.get("score") or 0)
+            if has_keyword_match and semantic_score < 0.25:
+                continue
             key = row["chunk_id"]
             merged.setdefault(key, row)
-            scores[key] = scores.get(key, 0.0) + 0.55 * max(float(row.get("score") or 0), 0.0) + 0.15 / (rank + 1)
+            scores[key] = scores.get(key, 0.0) + 0.55 * max(semantic_score, 0.0) + 0.15 / (rank + 1)
         ordered = sorted(merged.values(), key=lambda row: scores.get(row["chunk_id"], 0.0), reverse=True)
         for row in ordered:
             row["score"] = round(scores.get(row["chunk_id"], 0.0), 4)

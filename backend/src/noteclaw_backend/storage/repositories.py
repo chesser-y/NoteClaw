@@ -91,11 +91,55 @@ KEYWORD_STOPWORDS = {
     "with",
 }
 
+CJK_STOPWORDS = {
+    "一个",
+    "一下",
+    "什么",
+    "什么是",
+    "哪些",
+    "哪个",
+    "如何",
+    "怎么",
+    "怎么办",
+    "是否",
+    "可以",
+    "需要",
+    "这个",
+    "那个",
+    "请问",
+}
+
 
 def _terms(text: str) -> list[str]:
-    terms = [term.lower() for term in re.findall(r"[A-Za-z0-9_\-]+|[\u4e00-\u9fff]+", text)]
-    filtered = [term for term in terms if term not in KEYWORD_STOPWORDS and len(term) > 1]
+    terms: list[str] = []
+    for term in re.findall(r"[A-Za-z0-9_\-]+|[\u4e00-\u9fff]+", text):
+        lowered = term.lower()
+        if _is_cjk(lowered):
+            terms.extend(_cjk_terms(lowered))
+        else:
+            terms.append(lowered)
+    filtered = [
+        term
+        for term in dict.fromkeys(terms)
+        if term not in KEYWORD_STOPWORDS and term not in CJK_STOPWORDS and len(term) > 1
+    ]
     return filtered or terms
+
+
+def _is_cjk(text: str) -> bool:
+    return bool(text) and all("\u4e00" <= char <= "\u9fff" for char in text)
+
+
+def _cjk_terms(text: str) -> list[str]:
+    if len(text) <= 4:
+        return [text]
+    terms = [text]
+    for size in (4, 3, 2):
+        for index in range(0, len(text) - size + 1):
+            gram = text[index : index + size]
+            if gram not in CJK_STOPWORDS:
+                terms.append(gram)
+    return terms
 
 
 def _snippet(text: str, query: str, size: int = 220) -> str:
