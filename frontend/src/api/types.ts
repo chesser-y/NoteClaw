@@ -62,6 +62,7 @@ export type NoteListItem = {
   source?: string | null
   source_url?: string | null
   status: string
+  is_favorite?: boolean
   created_at: string
   updated_at: string
 }
@@ -126,6 +127,7 @@ export type ChatSessionRead = {
   created_at: string
   updated_at?: string
   message_count?: number
+  is_favorite?: boolean
 }
 
 export type ChatMessageRead = {

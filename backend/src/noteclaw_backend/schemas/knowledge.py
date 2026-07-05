@@ -26,6 +26,7 @@ class NoteListItem(BaseModel):
     source: str | None = None
     source_url: str | None = None
     status: NoteStatus = NoteStatus.QUEUED
+    is_favorite: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -48,6 +49,10 @@ class NoteUpdateRequest(BaseModel):
     summary: str | None = None
     tags: list[str] | None = None
     category: str | None = None
+
+
+class FavoriteRequest(BaseModel):
+    is_favorite: bool
 
 
 class FeedbackRequest(BaseModel):

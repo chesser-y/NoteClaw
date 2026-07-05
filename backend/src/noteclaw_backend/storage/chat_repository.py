@@ -41,6 +41,7 @@ class ChatSessionRow:
     created_at: datetime
     updated_at: datetime
     message_count: int
+    is_favorite: bool = False
 
 
 @dataclass
@@ -100,19 +101,21 @@ class SQLiteChatRepository:
             return None
         return self._session_row(row)
 
-    async def list_sessions(self, limit: int = 50) -> list[ChatSessionRow]:
+    async def list_sessions(
+        self, limit: int = 50, *, favorites_only: bool = False
+    ) -> list[ChatSessionRow]:
+        where = "where s.is_favorite = 1" if favorites_only else ""
+        sql = f"""
+            select s.*, (
+                select count(*) from chat_messages m where m.session_id = s.id
+            ) as message_count
+            from chat_sessions s
+            {where}
+            order by s.updated_at desc
+            limit ?
+        """
         with self.store.connect() as conn:
-            rows = conn.execute(
-                """
-                select s.*, (
-                    select count(*) from chat_messages m where m.session_id = s.id
-                ) as message_count
-                from chat_sessions s
-                order by s.updated_at desc
-                limit ?
-                """,
-                (limit,),
-            ).fetchall()
+            rows = conn.execute(sql, (limit,)).fetchall()
         return [self._session_row(row) for row in rows]
 
     async def rename_session(self, session_id: str, title: str) -> None:
@@ -121,6 +124,14 @@ class SQLiteChatRepository:
                 "update chat_sessions set title = ?, updated_at = ? where id = ?",
                 (title, _iso(utc_now()), session_id),
             )
+
+    async def set_session_favorite(self, session_id: str, value: bool) -> bool:
+        with self.store.connect() as conn:
+            cur = conn.execute(
+                "update chat_sessions set is_favorite = ?, updated_at = ? where id = ?",
+                (1 if value else 0, _iso(utc_now()), session_id),
+            )
+            return cur.rowcount > 0
 
     async def touch_session(self, session_id: str) -> None:
         with self.store.connect() as conn:
@@ -198,6 +209,7 @@ class SQLiteChatRepository:
         return [self._message_row(row) for row in rows]
 
     def _session_row(self, row: Row) -> ChatSessionRow:
+        keys = set(row.keys())
         return ChatSessionRow(
             id=row["id"],
             title=row["title"],
@@ -205,6 +217,7 @@ class SQLiteChatRepository:
             created_at=_dt(row["created_at"]),
             updated_at=_dt(row["updated_at"]),
             message_count=int(row["message_count"] or 0),
+            is_favorite=bool(row["is_favorite"]) if "is_favorite" in keys else False,
         )
 
     def _message_row(self, row: Row) -> ChatMessageRow:

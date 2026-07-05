@@ -1922,3 +1922,15 @@ a {
   overflow-y: hidden;
   padding: 2px 0;
 }
+.markdown-body .mermaid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: auto;
+  padding: 12px 0;
+  margin: 8px 0;
+}
+.markdown-body .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}

@@ -14,6 +14,7 @@ from noteclaw_backend.schemas.chat import (
     ChatSessionPatch,
     ChatSessionRead,
 )
+from noteclaw_backend.schemas.knowledge import FavoriteRequest
 from noteclaw_backend.schemas.reasoning import ReasoningRequest, ReasoningResponse
 from noteclaw_backend.services.chat import chat_service
 from noteclaw_backend.services.reasoning import reasoning_service
@@ -30,8 +31,9 @@ async def create_chat_session(request: ChatSessionCreate) -> ChatSessionRead:
 @router.get("/sessions", response_model=list[ChatSessionRead])
 async def list_chat_sessions(
     limit: int = Query(default=50, ge=1, le=200),
+    favorites_only: bool = Query(default=False),
 ) -> list[ChatSessionRead]:
-    return await chat_service.list_sessions(limit=limit)
+    return await chat_service.list_sessions(limit=limit, favorites_only=favorites_only)
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSessionDetail)
@@ -61,6 +63,27 @@ async def delete_chat_session(session_id: str) -> dict[str, bool]:
     if not deleted:
         raise HTTPException(status_code=404, detail="Chat session not found")
     return {"deleted": True}
+
+
+@router.patch("/sessions/{session_id}/favorite", response_model=ChatSessionRead)
+async def set_chat_session_favorite(
+    session_id: str,
+    request: FavoriteRequest,
+) -> ChatSessionRead:
+    ok = await chat_service.set_session_favorite(session_id, request.is_favorite)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    session = await chat_service.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return ChatSessionRead(
+        id=session.id,
+        title=session.title,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        message_count=session.message_count,
+        is_favorite=request.is_favorite,
+    )
 
 
 @router.post("/sessions/{session_id}/messages", response_model=ChatMessageResponse)

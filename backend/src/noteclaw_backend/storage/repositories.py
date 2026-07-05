@@ -189,6 +189,7 @@ class SQLiteKnowledgeRepository:
         date_from: date | None = None,
         date_to: date | None = None,
         metadata_filters: dict[str, str] | None = None,
+        is_favorite: bool | None = None,
     ) -> tuple[list[NoteListItem], int]:
         clauses = []
         params: list[Any] = []
@@ -222,6 +223,9 @@ class SQLiteKnowledgeRepository:
             for key, value in metadata_filters.items():
                 clauses.append("json_extract(metadata_json, ?) = ?")
                 params.extend([f"$.{key}", value])
+        if is_favorite is not None:
+            clauses.append("is_favorite = ?")
+            params.append(1 if is_favorite else 0)
         where = " where " + " and ".join(clauses) if clauses else ""
         with self.store.connect() as conn:
             rows = conn.execute(
@@ -257,6 +261,14 @@ class SQLiteKnowledgeRepository:
             }
         )
         await self.create_note(updated)
+
+    async def set_note_favorite(self, note_id: str, value: bool) -> bool:
+        with self.store.connect() as conn:
+            cur = conn.execute(
+                "update notes set is_favorite = ?, updated_at = ? where id = ?",
+                (1 if value else 0, _iso(utc_now()), note_id),
+            )
+            return cur.rowcount > 0
         return updated
 
     async def delete_note(self, note_id: str) -> None:
@@ -436,6 +448,7 @@ class SQLiteKnowledgeRepository:
             created_at=_dt(row["created_at"]),
             updated_at=_dt(row["updated_at"]),
             metadata=_load(row["metadata_json"], {}),
+            is_favorite=bool(row["is_favorite"]) if "is_favorite" in row.keys() else False,
             chunks=[
                 ChunkRead(
                     id=chunk["id"],
@@ -460,6 +473,7 @@ class SQLiteKnowledgeRepository:
             status=NoteStatus(row["status"]),
             created_at=_dt(row["created_at"]),
             updated_at=_dt(row["updated_at"]),
+            is_favorite=bool(row["is_favorite"]) if "is_favorite" in row.keys() else False,
         )
 
     def _chunk_search_row(self, row: Row) -> dict:

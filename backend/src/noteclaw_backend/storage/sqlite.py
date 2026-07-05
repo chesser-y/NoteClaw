@@ -100,3 +100,19 @@ class SQLiteStore:
     def init_schema(self) -> None:
         with self.connect() as conn:
             conn.executescript(SCHEMA_SQL)
+            self._ensure_column(conn, "notes", "is_favorite", "integer not null default 0")
+            self._ensure_column(conn, "chat_sessions", "is_favorite", "integer not null default 0")
+            conn.execute(
+                "create index if not exists idx_notes_favorite on notes(is_favorite, updated_at desc)"
+            )
+            conn.execute(
+                "create index if not exists idx_chat_sessions_favorite on chat_sessions(is_favorite, updated_at desc)"
+            )
+
+    @staticmethod
+    def _ensure_column(
+        conn: Connection, table: str, column: str, definition: str
+    ) -> None:
+        cols = {row[1] for row in conn.execute(f"pragma table_info({table})").fetchall()}
+        if column not in cols:
+            conn.execute(f"alter table {table} add column {column} {definition}")

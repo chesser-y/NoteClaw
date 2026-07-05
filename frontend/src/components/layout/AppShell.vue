@@ -13,6 +13,7 @@ import {
   Network,
   Menu,
   PanelLeftClose,
+  Star,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -132,15 +133,16 @@ function navTo(to: string) {
         <div class="nav-section">
           <div class="nav-heading">
             <span>{{ t('nav.favorites') }}</span>
-            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="margin-left: auto;">
-              <path d="M4 6l4 5 4-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
           </div>
           <div class="nav-list">
-            <div class="nav-link muted-static">
-              <span class="status-ring gray"></span>
-              <span style="color: #7b8089; font-size: 13px;">Star topics to pin</span>
-            </div>
+            <a
+              class="nav-link"
+              :class="{ active: route.path === '/favorites' }"
+              @click="navTo('/favorites')"
+            >
+              <Star :size="16" />
+              <span>{{ t('favorites.view-all') }}</span>
+            </a>
           </div>
         </div>
 

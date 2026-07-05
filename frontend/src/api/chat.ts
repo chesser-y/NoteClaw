@@ -16,8 +16,10 @@ export function createChatSession(payload: ChatSessionCreate) {
   })
 }
 
-export function listChatSessions(limit = 50) {
-  return apiFetch<ChatSessionRead[]>(`/chat/sessions?limit=${limit}`)
+export function listChatSessions(limit = 50, opts?: { favorites?: boolean }) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (opts?.favorites) params.set('favorites_only', 'true')
+  return apiFetch<ChatSessionRead[]>(`/chat/sessions?${params.toString()}`)
 }
 
 export function getChatSession(id: string) {
@@ -34,6 +36,13 @@ export function renameChatSession(id: string, title: string) {
 export function deleteChatSession(id: string) {
   return apiFetch<{ deleted: boolean }>(`/chat/sessions/${id}`, {
     method: 'DELETE',
+  })
+}
+
+export function setSessionFavorite(id: string, isFavorite: boolean) {
+  return apiFetch<ChatSessionRead>(`/chat/sessions/${id}/favorite`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_favorite: isFavorite }),
   })
 }
 

@@ -106,6 +106,16 @@
     "lang-zh": "中文",
     "lang-en": "English"
   },
+  "favorites": {
+    "view-all": "查看收藏",
+    "title": "收藏",
+    "tab-notes": "笔记",
+    "tab-sessions": "会话",
+    "empty": "还没有收藏。在 Library 或 Inbox 里点星标，会出现在这里。",
+    "empty-notes": "暂无收藏的笔记",
+    "empty-sessions": "暂无收藏的会话",
+    "open": "打开"
+  },
   "palette": {
     "placeholder": "搜索命令或提问…",
     "section-navigate": "导航",

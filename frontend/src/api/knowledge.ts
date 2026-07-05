@@ -9,6 +9,7 @@ export function listKnowledge(params: {
   source?: string
   date_from?: string
   date_to?: string
+  is_favorite?: boolean
   limit?: number
   offset?: number
 }) {
@@ -20,6 +21,7 @@ export function listKnowledge(params: {
   if (params.source) query.set('source', params.source)
   if (params.date_from) query.set('date_from', params.date_from)
   if (params.date_to) query.set('date_to', params.date_to)
+  if (params.is_favorite) query.set('is_favorite', 'true')
   query.set('limit', String(params.limit ?? 20))
   query.set('offset', String(params.offset ?? 0))
 
@@ -61,4 +63,11 @@ export function getKnowledgeGraph(params: {
   if (params.limit_notes != null) query.set('limit_notes', String(params.limit_notes))
   if (params.focus_tag) query.set('focus_tag', params.focus_tag)
   return apiFetch<KGResponse>(`/knowledge/graph?${query.toString()}`)
+}
+
+export function setNoteFavorite(noteId: string, isFavorite: boolean) {
+  return apiFetch<NoteDetail>(`/knowledge/${noteId}/favorite`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_favorite: isFavorite }),
+  })
 }

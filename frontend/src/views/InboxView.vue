@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Send, MoreHorizontal, Plus, Trash2, MessageSquare } from "lucide-vue-next"
+import { Send, MoreHorizontal, Plus, Trash2, MessageSquare, Star } from "lucide-vue-next"
 import { useUiStore } from '../stores/ui'
 import { useChatStore } from '../stores/chat'
 import { useIngest } from '../composables/useIngest'
 import { useHorizontalDrag } from '../composables/useDrag'
-import { listChatSessions, deleteChatSession } from '../api/chat'
+import { listChatSessions, deleteChatSession, setSessionFavorite } from '../api/chat'
 import type { ChatSessionRead } from '../api/types'
 import SourcePreview from '../components/home/SourcePreview.vue'
 import UnderstandingPanel from '../components/home/UnderstandingPanel.vue'
@@ -107,6 +107,18 @@ async function removeSession(id: string, ev: Event) {
     if (chat.sessionId === id) chat.reset()
   } catch (e) {
     console.error(e)
+  }
+}
+
+async function toggleSessionFav(s: ChatSessionRead, ev: Event) {
+  ev.stopPropagation()
+  const next = !s.is_favorite
+  const before = s.is_favorite
+  s.is_favorite = next
+  try {
+    await setSessionFavorite(s.id, next)
+  } catch {
+    s.is_favorite = before
   }
 }
 
@@ -219,6 +231,15 @@ void hasConversation
                 · {{ relativeTime(s.updated_at || s.created_at) }}
               </span>
             </div>
+            <button
+              class="icon-button session-star"
+              :class="{ active: s.is_favorite }"
+              type="button"
+              :title="t('favorites.title')"
+              @click="toggleSessionFav(s, $event)"
+            >
+              <Star :size="12" :fill="s.is_favorite ? 'currentColor' : 'none'" />
+            </button>
             <button
               class="icon-button session-delete"
               type="button"
@@ -456,6 +477,26 @@ void hasConversation
 .session-delete:hover {
   background: rgba(232, 91, 134, 0.18);
   color: var(--pink);
+}
+.session-star {
+  opacity: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--orange, #f5a524);
+  transition: opacity 120ms ease;
+}
+.session-card:hover .session-star {
+  opacity: 1;
+}
+.session-star.active {
+  opacity: 1;
+}
+.session-star:hover {
+  background: rgba(245, 165, 36, 0.18);
 }
 
 .mode-seg {

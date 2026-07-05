@@ -40,9 +40,11 @@ class ChatService:
         )
         return self._session_read(row)
 
-    async def list_sessions(self, limit: int = 50) -> list[ChatSessionRead]:
+    async def list_sessions(
+        self, limit: int = 50, *, favorites_only: bool = False
+    ) -> list[ChatSessionRead]:
         repo = get_chat_repository()
-        rows = await repo.list_sessions(limit=limit)
+        rows = await repo.list_sessions(limit=limit, favorites_only=favorites_only)
         return [self._session_read(row) for row in rows]
 
     async def get_session(self, session_id: str) -> ChatSessionDetail | None:
@@ -77,6 +79,10 @@ class ChatService:
             return False
         await repo.delete_session(session_id)
         return True
+
+    async def set_session_favorite(self, session_id: str, value: bool) -> bool:
+        repo = get_chat_repository()
+        return await repo.set_session_favorite(session_id, value)
 
     async def send_message(
         self,
@@ -531,6 +537,7 @@ class ChatService:
             created_at=row.created_at,
             updated_at=row.updated_at,
             message_count=row.message_count,
+            is_favorite=getattr(row, "is_favorite", False),
         )
 
     def _message_read(self, row) -> ChatMessageRead:

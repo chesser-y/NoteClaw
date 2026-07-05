@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from noteclaw_backend.domain.enums import ContentType
 from noteclaw_backend.schemas.common import ApiMessage
 from noteclaw_backend.schemas.knowledge import (
+    FavoriteRequest,
     FeedbackRequest,
     FeedbackResponse,
     KnowledgeListResponse,
@@ -33,6 +34,7 @@ async def list_knowledge(
     source: str | None = None,
     source_contains: str | None = None,
     review_status: str | None = None,
+    is_favorite: bool | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     limit: int = Query(default=20, ge=1, le=100),
@@ -53,6 +55,7 @@ async def list_knowledge(
         date_from=date_from,
         date_to=date_to,
         metadata_filters=metadata_filters,
+        is_favorite=is_favorite,
     )
     return KnowledgeListResponse(items=items, total=total, limit=limit, offset=offset)
 
@@ -153,6 +156,17 @@ async def patch_note_metadata(
     updated = note.model_copy(update={"metadata": metadata})
     await get_repository().create_note(updated)
     return updated
+
+
+@router.patch("/{note_id}/favorite", response_model=NoteDetail)
+async def set_note_favorite(note_id: str, request: FavoriteRequest) -> NoteDetail:
+    ok = await get_repository().set_note_favorite(note_id, request.is_favorite)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Note not found")
+    note = await get_repository().get_note(note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note
 
 
 @router.delete("/{note_id}", response_model=ApiMessage)

@@ -10,6 +10,7 @@ import ReviewView from '../views/ReviewView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import QualityView from '../views/QualityView.vue'
 import KnowledgeGraphView from '../views/KnowledgeGraphView.vue'
+import FavoritesView from '../views/FavoritesView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -25,6 +26,7 @@ export const router = createRouter({
         { path: 'timeline', name: 'timeline', component: TimelineView },
         { path: 'studio', name: 'studio', component: StudioView },
         { path: 'review', name: 'review', component: ReviewView },
+        { path: 'favorites', name: 'favorites', component: FavoritesView },
         { path: 'settings', name: 'settings', component: SettingsView },
         { path: 'settings/quality', name: 'quality', component: QualityView },
         { path: 'graph', name: 'graph', component: KnowledgeGraphView },

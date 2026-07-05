@@ -20,6 +20,7 @@ class ChatSessionRead(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     message_count: int = 0
+    is_favorite: bool = False
 
 
 class ChatMessageRead(BaseModel):
