@@ -1,17 +1,24 @@
 from __future__ import annotations
 
+import json
 import re
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-from noteclaw_backend.domain.enums import GenerationType, SearchMode, TaskStatus, TaskType
-from noteclaw_backend.schemas.common import Artifact, Citation, new_id
+from noteclaw_backend.domain.enums import ContentType, GenerationType, NoteStatus, SearchMode, TaskStatus, TaskType
+from noteclaw_backend.schemas.common import Artifact, Citation, new_id, utc_now
 from noteclaw_backend.schemas.generation import (
     GenerationPreviewResponse,
     GenerationRequest,
     GenerationTaskResponse,
 )
+from noteclaw_backend.schemas.knowledge import NoteDetail
+from noteclaw_backend.services.html_renderer import render_slide_html
+from noteclaw_backend.services.html_screenshot import html_batch_to_png, shutdown_browser
 from noteclaw_backend.services.providers import get_image_provider, get_llm_provider
 from noteclaw_backend.services.retrieval import retrieval_service
+from noteclaw_backend.services.slide_layout_agent import decide_slide_layouts
 from noteclaw_backend.services.task_service import task_service
 from noteclaw_backend.settings import get_settings
 
@@ -71,11 +78,205 @@ class GenerationService:
             for row in rows
         ]
         content = await self._generate_content(request, rows)
+        note_id: str | None = None
+        try:
+            note_id = await self._persist_generation_note(request, content, citations)
+        except Exception:
+            # Persistence is best-effort; never block the preview response.
+            pass
+        download_url = f"/api/knowledge/{note_id}/file" if note_id else None
+        artifact_url = self._extract_artifact_url(content) if isinstance(content, dict) else None
+        document_extension = self._document_extension_for(request.generation_type, content)
         return GenerationPreviewResponse(
             generation_type=request.generation_type,
             content=content,
             citations=citations,
+            note_id=note_id,
+            artifact_url=artifact_url,
+            download_url=download_url,
+            document_extension=document_extension,
         )
+
+    def _extract_artifact_url(self, content: dict[str, Any]) -> str | None:
+        artifact = content.get("artifact")
+        if isinstance(artifact, dict):
+            url = artifact.get("url")
+            if isinstance(url, str):
+                return url
+        return None
+
+    def _document_extension_for(self, gtype: GenerationType, content: dict[str, Any] | str) -> str | None:
+        """File extension to use when persisting this generation as a downloadable document."""
+        if gtype == GenerationType.PPTX:
+            return "pptx"
+        if gtype == GenerationType.IMAGE:
+            return None  # image_url is remote; no local file
+        if gtype in {GenerationType.MIND_MAP, GenerationType.DIAGRAM}:
+            return "mmd"
+        if gtype == GenerationType.TABLE:
+            return "md"
+        # All other markdown-shaped outputs
+        return "md"
+
+    async def _persist_generation_note(
+        self,
+        request: GenerationRequest,
+        content: dict[str, Any] | str,
+        citations: list[Citation],
+    ) -> str | None:
+        """Persist a generation output as a note so it shows up in Library / Graph / Research."""
+        from noteclaw_backend.storage.repositories import get_repository
+
+        gtype = request.generation_type
+        title = self._derive_generation_title(request, content)
+        markdown, content_type, stored_path, extra_meta = self._serialize_generation_content(gtype, content)
+
+        # For text/markdown/mermaid outputs without an existing artifact, write the
+        # body to a real file so the user can download an actual document.
+        if stored_path is None:
+            extension = self._document_extension_for(gtype, content)
+            if extension and markdown:
+                stored_path = self._write_document_file(title, markdown, extension)
+                extra_meta = {**(extra_meta or {}), "document_extension": extension}
+
+        citation_tag = f"gen:{gtype.value}"
+        tags = ["generation", citation_tag]
+        theme = request.options.theme
+        if theme:
+            tags.append(theme)
+
+        now = utc_now()
+        metadata: dict[str, Any] = {
+            "generation_type": gtype.value,
+            "prompt": request.prompt[:400],
+            "citation_count": len(citations),
+            "citation_note_ids": [c.note_id for c in citations[:8]],
+        }
+        if stored_path is not None:
+            metadata["stored_path"] = str(stored_path)
+        if extra_meta:
+            metadata.update(extra_meta)
+
+        note = NoteDetail(
+            id=new_id("note"),
+            title=title,
+            content_type=content_type,
+            content=markdown,
+            summary=self._summary_from_markdown(markdown),
+            tags=tags,
+            category="generation",
+            source="generation",
+            source_url=None,
+            status=NoteStatus.READY,
+            created_at=now,
+            updated_at=now,
+            metadata=metadata,
+            chunks=[],
+        )
+        await get_repository().create_note(note)
+        return note.id
+
+    def _write_document_file(self, title: str, body: str, extension: str) -> Path:
+        out_dir = get_settings().storage_dir / "generated"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        doc_id = new_id("doc")
+        safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", title or "document")[:50] or "document"
+        path = out_dir / f"{doc_id}_{safe_title}.{extension}"
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    def _derive_generation_title(self, request: GenerationRequest, content: dict[str, Any] | str) -> str:
+        if isinstance(content, dict):
+            for key in ("title",):
+                value = content.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()[:140]
+            inner = content.get("outline")
+            if isinstance(inner, dict) and isinstance(inner.get("title"), str):
+                return inner["title"].strip()[:140]
+        label = request.generation_type.value.replace("_", " ")
+        return f"{label.title()} · {request.prompt.strip()[:80]}"
+
+    def _summary_from_markdown(self, markdown: str) -> str:
+        text = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", markdown)
+        text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:200]
+
+    def _serialize_generation_content(
+        self,
+        gtype: GenerationType,
+        content: dict[str, Any] | str,
+    ) -> tuple[str, ContentType, Path | None, dict[str, Any]]:
+        """Convert a generation payload into (markdown_body, content_type, optional file path, extra metadata)."""
+        if isinstance(content, str):
+            ctype = ContentType.CODE if gtype in {GenerationType.MIND_MAP, GenerationType.DIAGRAM} else ContentType.TEXT
+            return content, ctype, None, {}
+
+        if gtype == GenerationType.PPTX:
+            outline = content.get("outline") or {}
+            artifact = content.get("artifact") or {}
+            stored_path_str = artifact.get("url") if isinstance(artifact, dict) else None
+            stored_path = Path(stored_path_str) if stored_path_str else None
+            slide_images = content.get("slide_images") or []
+            markdown = self._ppt_outline_to_markdown(outline)
+            extra: dict[str, Any] = {
+                "slide_count": len(outline.get("slides") or []),
+                "slide_images": [str(p) for p in slide_images] if slide_images else [],
+                "renderer": artifact.get("metadata", {}).get("renderer") if isinstance(artifact, dict) else None,
+                "artifact_url": stored_path_str,
+            }
+            return markdown, ContentType.DOCUMENT, stored_path, extra
+
+        if gtype == GenerationType.PPT_OUTLINE:
+            outline = content if isinstance(content, dict) else {}
+            return self._ppt_outline_to_markdown(outline), ContentType.TEXT, None, {}
+
+        if gtype == GenerationType.TABLE:
+            markdown = content.get("markdown") if isinstance(content, dict) else ""
+            return str(markdown or ""), ContentType.TABLE, None, {}
+
+        if gtype == GenerationType.VIDEO_SCRIPT:
+            markdown = content.get("markdown") if isinstance(content, dict) else ""
+            return str(markdown or json.dumps(content, ensure_ascii=False, indent=2)), ContentType.TEXT, None, {}
+
+        if gtype == GenerationType.IMAGE:
+            data = content if isinstance(content, dict) else {}
+            prompt = str(data.get("prompt") or "")
+            url = data.get("url")
+            md_lines = [f"# Image prompt", "", prompt]
+            if url:
+                md_lines += ["", f"![generated image]({url})"]
+            extra_meta: dict[str, Any] = {"image_prompt": prompt[:600]}
+            if url:
+                extra_meta["image_url"] = url
+            return "\n".join(md_lines), ContentType.IMAGE, None, extra_meta
+
+        # Fallback: dump as pretty JSON inside a fenced block.
+        body = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False, indent=2)
+        return f"```json\n{body}\n```", ContentType.TEXT, None, {}
+
+    def _ppt_outline_to_markdown(self, outline: dict[str, Any]) -> str:
+        title = str(outline.get("title") or "Untitled deck").strip()
+        slides = list(outline.get("slides") or [])
+        lines = [f"# {title}", ""]
+        for idx, slide in enumerate(slides, start=1):
+            slide_title = str(slide.get("title") or f"Slide {idx}").strip()
+            lines.append(f"## {idx}. {slide_title}")
+            layout = slide.get("layout")
+            if layout:
+                lines.append(f"_layout: {layout}_")
+            for key in ("bullets", "points", "subtitle"):
+                bullets = slide.get(key)
+                if not bullets:
+                    continue
+                if isinstance(bullets, str):
+                    bullets = [bullets]
+                for b in bullets:
+                    lines.append(f"- {b}")
+            lines.append("")
+        return "\n".join(lines)
 
     async def _generate_content(self, request: GenerationRequest, rows: list[dict]) -> dict[str, Any] | str:
         if request.generation_type == GenerationType.PPT_OUTLINE:
@@ -150,12 +351,104 @@ class GenerationService:
     async def _pptx_generation(self, request: GenerationRequest, rows: list[dict]) -> dict[str, Any]:
         outline = await self._try_llm_ppt_outline(request, rows)
         outline = outline or self._fallback_ppt_outline(request, rows)
-        artifact, warning = self._write_pptx(outline)
+
+        deck_meta = {
+            "title": outline.get("title") or request.prompt[:80],
+            "label": outline.get("title") or "NoteClaw Deck",
+            "author": "Generated by NoteClaw",
+        }
+        slides = list(outline.get("slides") or [])
+        layouts = await decide_slide_layouts(slides, deck_title=deck_meta["title"])
+
+        # Build HTML for each slide (always — used for preview + PNG render)
+        html_strings: list[str] = []
+        for idx, (slide, layout) in enumerate(zip(slides, layouts), start=1):
+            html_strings.append(render_slide_html(slide, layout, deck_meta, idx))
+
+        artifact, warning, slide_images = await self._write_pptx_from_html(outline, html_strings)
+
         return {
             "outline": outline,
+            "html_slides": html_strings,
+            "slide_images": [str(p) for p in slide_images] if slide_images else [],
+            "layouts": layouts,
             "artifact": artifact.model_dump(mode="json") if artifact else None,
             "warning": warning,
         }
+
+    async def _write_pptx_from_html(
+        self,
+        outline: dict[str, Any],
+        html_strings: list[str],
+    ) -> tuple[Artifact | None, str | None, list[Path]]:
+        """Try HTML→PNG→python-pptx; fall back to legacy direct-write if Playwright missing."""
+        if html_strings:
+            png_paths = await self._render_html_slides(html_strings, outline.get("title") or "deck")
+            if png_paths:
+                artifact = self._write_pptx_from_images(png_paths)
+                if artifact is not None:
+                    return artifact, None, list(png_paths)
+                return None, "HTML→PNG rendered but PPTX assembly failed", list(png_paths)
+            # PNG render failed entirely → fall back to legacy writer
+            legacy_artifact, legacy_warning = self._write_pptx(outline)
+            warning = f"playwright unavailable, fell back to plain PPTX; {legacy_warning or ''}".strip("; ")
+            return legacy_artifact, warning, []
+
+        # No HTML slides (empty outline?) — try legacy
+        artifact, warning = self._write_pptx(outline)
+        return artifact, warning, []
+
+    async def _render_html_slides(self, html_strings: list[str], title: str) -> list[Any]:
+        storage = get_settings().storage_dir / "slide_images"
+        storage.mkdir(parents=True, exist_ok=True)
+        safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", str(title))[:40] or "deck"
+        items = []
+        for idx, html in enumerate(html_strings, start=1):
+            out_path = storage / f"{safe_title}_{idx:02d}.png"
+            items.append((html, out_path))
+        return await html_batch_to_png(items)
+
+    def _write_pptx_from_images(self, png_paths: list[Any]) -> Artifact | None:
+        try:
+            from pptx import Presentation  # type: ignore
+            from pptx.util import Inches  # type: ignore
+        except Exception as exc:  # noqa: BLE001
+            return None
+
+        try:
+            presentation = Presentation()
+            presentation.slide_width = Inches(13.333)  # 16:9 widescreen
+            presentation.slide_height = Inches(7.5)
+            blank_layout = presentation.slide_layouts[6]
+
+            for png in png_paths:
+                slide = presentation.slides.add_slide(blank_layout)
+                slide.shapes.add_picture(
+                    str(png),
+                    left=0,
+                    top=0,
+                    width=presentation.slide_width,
+                    height=presentation.slide_height,
+                )
+
+            output_dir = get_settings().storage_dir / "generated"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            artifact_id = new_id("artifact")
+            safe_title = f"deck_{artifact_id[-8:]}"
+            path = output_dir / f"{artifact_id}_{safe_title}.pptx"
+            presentation.save(path)
+            return Artifact(
+                id=artifact_id,
+                type="pptx",
+                name=path.name,
+                url=str(path),
+                metadata={
+                    "slide_count": len(presentation.slides),
+                    "renderer": "html_to_png",
+                },
+            )
+        except Exception:
+            return None
 
     def _write_pptx(self, outline: dict[str, Any]) -> tuple[Artifact | None, str | None]:
         try:

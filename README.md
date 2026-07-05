@@ -14,6 +14,30 @@ Personal knowledge base assistant for the hackathon project.
 - Content generation: Markdown reports, Mermaid mind maps, and real `.pptx` export with theme templates and generated images.
 
 Backend lives in `backend/`.
+Frontend lives in `frontend/`.
+
+## Local Run
+
+Backend:
+
+```powershell
+cd backend
+python -m uv run noteclaw-backend
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1
+```
+
+Frontend URL:
+
+```text
+http://127.0.0.1:5173/
+```
 
 ## Development Docs
 

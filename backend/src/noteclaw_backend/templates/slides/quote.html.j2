@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --accent: #626be6;
+    --text: #f4f5f7;
+    --muted: #8b8f99;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    background: radial-gradient(circle at 30% 50%, rgba(98, 107, 230, 0.18) 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 96px 120px;
+    text-align: center;
+  }
+  .quote-mark {
+    font-size: 96px;
+    line-height: 0.5;
+    color: var(--accent);
+    opacity: 0.5;
+    margin-bottom: 24px;
+    font-family: Georgia, serif;
+  }
+  blockquote {
+    font-size: {{ quote_size | default(36) }}px;
+    font-weight: 500;
+    line-height: 1.4;
+    max-width: 960px;
+    margin: 0 auto;
+    letter-spacing: -0.3px;
+  }
+  .attribution {
+    margin-top: 36px;
+    font-size: 18px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .attribution::before {
+    content: "— ";
+  }
+</style>
+</head>
+<body>
+  <div class="quote-mark">"</div>
+  <blockquote>{{ quote }}</blockquote>
+  {% if attribution %}<div class="attribution">{{ attribution }}</div>{% endif %}
+</body>
+</html>
