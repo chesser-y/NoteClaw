@@ -336,7 +336,7 @@ type GenerationType =
 
 ### `POST /api/chat/sessions/{session_id}/messages`
 
-用途：向指定会话发送问题，并获得基于知识库的回答。
+用途：向指定会话发送问题，并获得基于知识库的完整 JSON 回答。该接口保留用于兼容；前端交互优先使用下方流式接口。
 
 请求：
 
@@ -383,6 +383,34 @@ type GenerationType =
 
 - 普通 RAG：`RetrievalService -> LLMProvider -> answer + citations`。
 - 跨文档推理：`RetrievalService broad context -> NanobotHarness -> answer + trace`。
+
+### `POST /api/chat/sessions/{session_id}/messages/stream`
+
+用途：向指定会话发送问题，并以 `text/event-stream` 流式返回状态、增量回答和最终结构化结果。
+
+请求体同 `POST /api/chat/sessions/{session_id}/messages`。
+
+事件：
+
+```text
+event: status
+data: {"stage":"retrieval","message":"Retrieving knowledge chunks","progress":0.18}
+
+event: delta
+data: {"delta":"增量文本"}
+
+event: final
+data: {"message_id":"msg_...","answer":"完整回答","citations":[],"trace":{...}}
+
+event: error
+data: {"message":"错误信息"}
+```
+
+约定：
+
+- `final` 的 payload 与非流式接口返回结构一致。
+- Agent 模式会通过 `status` 事件输出 coordinator / researcher / reasoner / reviewer 阶段进度。
+- Agent trace 的 `plan`、`steps`、`review`、`workflow_id` 位于 `trace` 顶层，同时保留 `trace.metadata` 供调试。
 
 ## 内容生成
 

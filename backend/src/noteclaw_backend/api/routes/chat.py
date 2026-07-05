@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from noteclaw_backend.schemas.chat import (
     ChatMessageRequest,
@@ -27,6 +28,21 @@ async def send_chat_message(
     request: ChatMessageRequest,
 ) -> ChatMessageResponse:
     return await chat_service.send_message(session_id, request)
+
+
+@router.post("/sessions/{session_id}/messages/stream")
+async def stream_chat_message(
+    session_id: str,
+    request: ChatMessageRequest,
+) -> StreamingResponse:
+    return StreamingResponse(
+        chat_service.stream_message_events(session_id, request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/reason", response_model=ReasoningResponse)

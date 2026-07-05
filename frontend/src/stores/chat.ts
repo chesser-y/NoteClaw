@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { createChatSession, sendChatMessage } from '../api/chat'
+import { createChatSession, sendChatMessageStream } from '../api/chat'
 import type { ChatMessageResponse, ChatReasoningMode, Citation, Scope } from '../api/types'
 
 export type ChatTurn = {
@@ -8,6 +8,8 @@ export type ChatTurn = {
   content: string
   citations?: Citation[]
   trace?: ChatMessageResponse['trace']
+  pending?: boolean
+  status?: string
 }
 
 const MODE_KEY = 'noteclaw.chat-mode'
@@ -29,8 +31,17 @@ export const useChatStore = defineStore('chat', () => {
   async function ask(question: string) {
     if (!question.trim() || sending.value) return
     turns.value.push({ role: 'user', content: question })
+    const assistantTurn: ChatTurn = {
+      role: 'assistant',
+      content: '',
+      citations: [],
+      pending: true,
+      status: 'Question received',
+    }
+    turns.value.push(assistantTurn)
     sending.value = true
     error.value = null
+    let finalReceived = false
     try {
       if (!sessionId.value) {
         const session = await createChatSession({ scope: scope.value ?? undefined })
@@ -38,25 +49,56 @@ export const useChatStore = defineStore('chat', () => {
       }
       const currentMode = mode.value
       const useWeb = currentMode === 'web'
-      const res = await sendChatMessage(sessionId.value!, {
-        message: question,
-        retrieval_mode: 'hybrid',
-        use_nanobot_reasoning: currentMode === 'deep',
-        use_web_research: useWeb,
-        reasoning_mode: currentMode,
-        top_k: 8,
-        max_reasoning_steps: currentMode === 'normal' ? 3 : 4,
-        web_results: 4,
-        fetch_web_pages: useWeb,
-      })
-      turns.value.push({
-        role: 'assistant',
-        content: res.answer,
-        citations: res.citations,
-        trace: res.trace,
-      })
+      await sendChatMessageStream(
+        sessionId.value!,
+        {
+          message: question,
+          retrieval_mode: 'hybrid',
+          use_nanobot_reasoning: currentMode === 'deep',
+          use_web_research: useWeb,
+          reasoning_mode: currentMode,
+          top_k: 8,
+          max_reasoning_steps: currentMode === 'normal' ? 3 : 4,
+          web_results: 4,
+          fetch_web_pages: useWeb,
+        },
+        {
+          onStatus(status) {
+            assistantTurn.status = status.message || status.stage || 'Working'
+            if (Array.isArray(status.plan)) {
+              assistantTurn.trace = {
+                retrieval_mode: 'hybrid',
+                used_nanobot: currentMode !== 'normal',
+                metadata: {},
+                plan: status.plan,
+              }
+            }
+          },
+          onDelta(delta) {
+            assistantTurn.content += delta
+            assistantTurn.status = ''
+          },
+          onFinal(res) {
+            finalReceived = true
+            assistantTurn.content = res.answer || assistantTurn.content
+            assistantTurn.citations = res.citations
+            assistantTurn.trace = res.trace
+            assistantTurn.pending = false
+            assistantTurn.status = ''
+          },
+        },
+      )
+      if (!finalReceived) {
+        assistantTurn.pending = false
+        assistantTurn.status = ''
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
+      assistantTurn.pending = false
+      assistantTurn.status = ''
+      if (!assistantTurn.content) {
+        turns.value = turns.value.filter((turn) => turn !== assistantTurn)
+      }
     } finally {
       sending.value = false
     }

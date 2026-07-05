@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import json
 import re
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -299,6 +300,35 @@ class NoteClawOpenAICompat:
             return ""
         content = getattr(choice.message, "content", None)
         return content or ""
+
+    async def stream_text(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int = 1024,
+    ) -> AsyncIterator[str]:
+        endpoint = ProviderEndpoint(
+            api_key=self._config.chat.api_key,
+            base_url=self._config.chat.base_url,
+            model=model or self._config.chat.model,
+        )
+        _ensure_credentials(endpoint, "Chat")
+
+        stream = await self._client(endpoint).chat.completions.create(
+            model=endpoint.model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+        )
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            content = getattr(chunk.choices[0].delta, "content", None)
+            if content:
+                yield str(content)
 
     async def complete_json(
         self,

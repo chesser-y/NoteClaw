@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Globe2, MessageSquareText, Send } from 'lucide-vue-next'
 import { useUiStore } from '../../stores/ui'
-import { createChatSession, sendChatMessage } from '../../api/chat'
+import { createChatSession, sendChatMessageStream } from '../../api/chat'
 import type { ChatMessageResponse } from '../../api/types'
 import SourceList from '../common/SourceList.vue'
 import Drawer from '../common/Drawer.vue'
@@ -25,6 +25,8 @@ const input = ref(ui.askPrefill || '')
 const sending = ref(false)
 const error = ref('')
 const last = ref<ChatMessageResponse | null>(null)
+const streamingAnswer = ref('')
+const streamingStatus = ref('')
 const useWeb = ref(false)
 
 watch(
@@ -45,6 +47,9 @@ async function submit() {
   if (!message || sending.value) return
   sending.value = true
   error.value = ''
+  last.value = null
+  streamingAnswer.value = ''
+  streamingStatus.value = 'Question received'
   try {
     const scope =
       ui.askScope && ui.askScope.noteIds.length
@@ -54,18 +59,34 @@ async function submit() {
       title: ui.askScope?.title ?? message.slice(0, 40),
       scope,
     })
-    const res = await sendChatMessage(session.id, {
-      message,
-      retrieval_mode: 'hybrid',
-      reasoning_mode: useWeb.value ? 'web' : 'normal',
-      use_nanobot_reasoning: false,
-      use_web_research: useWeb.value,
-      top_k: 6,
-      max_reasoning_steps: useWeb.value ? 4 : 3,
-      web_results: 4,
-      fetch_web_pages: useWeb.value,
-    })
-    last.value = res
+    await sendChatMessageStream(
+      session.id,
+      {
+        message,
+        retrieval_mode: 'hybrid',
+        reasoning_mode: useWeb.value ? 'web' : 'normal',
+        use_nanobot_reasoning: false,
+        use_web_research: useWeb.value,
+        top_k: 6,
+        max_reasoning_steps: useWeb.value ? 4 : 3,
+        web_results: 4,
+        fetch_web_pages: useWeb.value,
+      },
+      {
+        onStatus(status) {
+          streamingStatus.value = status.message || status.stage || 'Working'
+        },
+        onDelta(delta) {
+          streamingAnswer.value += delta
+          streamingStatus.value = ''
+        },
+        onFinal(res) {
+          last.value = res
+          streamingAnswer.value = res.answer || streamingAnswer.value
+          streamingStatus.value = ''
+        },
+      },
+    )
     input.value = ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -116,17 +137,17 @@ async function submit() {
         {{ error }}
       </p>
 
-      <div v-if="last" class="space-y-3">
+      <div v-if="last || streamingAnswer || streamingStatus" class="space-y-3">
         <div class="rounded-xl border border-[#24262a] bg-[#151618] p-4 text-sm leading-6 text-[#f0f1f2]">
-          {{ last.answer }}
+          {{ last?.answer || streamingAnswer || streamingStatus }}
         </div>
 
-        <div>
+        <div v-if="last?.citations?.length">
           <div class="mb-2 text-xs font-medium uppercase tracking-wide text-[#929399]">Sources used</div>
           <SourceList :sources="last.citations" />
         </div>
 
-        <div class="text-[11px] text-[#73747a]">
+        <div v-if="last" class="text-[11px] text-[#73747a]">
           检索模式：{{ last.trace.retrieval_mode }} · nanobot：{{ last.trace.used_nanobot ? '是' : '否' }}
         </div>
       </div>

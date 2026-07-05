@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from functools import lru_cache
 from typing import Any
 
@@ -54,6 +55,21 @@ class _OpenAICompatLLMProvider:
 
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
         return await self.client.complete_json(messages, schema=schema)  # type: ignore[arg-type]
+
+    async def stream_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str]:
+        kwargs: dict[str, Any] = {}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        async for chunk in self.client.stream_text(messages, **kwargs):  # type: ignore[arg-type]
+            yield chunk
 
 
 class _OpenAICompatEmbeddingProvider:

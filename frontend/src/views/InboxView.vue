@@ -248,7 +248,9 @@ void hasConversation
           <div v-for="(turn, i) in chat.turns" :key="i" class="chat-msg" :class="turn.role">
             <div class="avatar">{{ turn.role === 'user' ? 'U' : 'NC' }}</div>
             <div style="flex: 1; min-width: 0;">
-              <div class="bubble">{{ turn.content }}</div>
+              <div class="bubble" :class="{ muted: turn.pending && !turn.content }">
+                {{ turn.content || turn.status || (turn.pending ? chatThinking : '') }}
+              </div>
               <AgentTracePanel
                 v-if="turn.role === 'assistant' && turn.trace?.steps?.length"
                 :trace="turn.trace"
@@ -266,10 +268,7 @@ void hasConversation
             </div>
           </div>
 
-          <div v-if="chat.sending" class="chat-msg assistant">
-            <div class="avatar">NC</div>
-            <div class="bubble muted">{{ chatThinking }}</div>
-          </div>
+          <div v-if="chat.error" class="placeholder error">{{ chat.error }}</div>
         </div>
 
         <div class="chat-input-bar">
@@ -309,7 +308,9 @@ void hasConversation
         <div v-for="(turn, i) in chat.turns" :key="i" class="chat-msg" :class="turn.role">
           <div class="avatar">{{ turn.role === 'user' ? 'U' : 'NC' }}</div>
           <div style="flex: 1; min-width: 0;">
-            <div class="bubble">{{ turn.content }}</div>
+            <div class="bubble" :class="{ muted: turn.pending && !turn.content }">
+              {{ turn.content || turn.status || (turn.pending ? chatThinking : '') }}
+            </div>
             <AgentTracePanel
               v-if="turn.role === 'assistant' && turn.trace?.steps?.length"
               :trace="turn.trace"
@@ -328,6 +329,7 @@ void hasConversation
         </div>
 
         <div v-if="!chat.turns.length" class="placeholder">{{ t('inbox.no-conversation') }}</div>
+        <div v-if="chat.error" class="placeholder error">{{ chat.error }}</div>
       </div>
 
       <div class="chat-input-bar">

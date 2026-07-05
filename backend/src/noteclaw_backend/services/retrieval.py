@@ -54,7 +54,10 @@ class RetrievalService:
             rows = await self._semantic_search(query, top_k, filters=filters, scope=scope)
             return self._with_display_scores(rows, mode)
         keyword_rows = await get_repository().keyword_search(query, filters, max(top_k * 2, 10))
-        semantic_rows = await self._semantic_search(query, max(top_k * 2, 10), filters=filters, scope=scope)
+        try:
+            semantic_rows = await self._semantic_search(query, max(top_k * 2, 10), filters=filters, scope=scope)
+        except Exception:
+            semantic_rows = []
         rows = self._merge_results(keyword_rows, semantic_rows, top_k, scope=scope)
         return self._with_display_scores(rows, mode)
 

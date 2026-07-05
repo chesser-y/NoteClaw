@@ -173,6 +173,19 @@ export type ChatMessageResponse = {
   }
 }
 
+export type ChatStreamStatus = {
+  stage?: string
+  message?: string
+  progress?: number
+  reasoning_mode?: ChatReasoningMode
+  citation_count?: number
+  plan?: string[]
+  workflow_id?: string | null
+  task_id?: string | null
+  review?: AgentReview | Record<string, unknown> | null
+  [key: string]: unknown
+}
+
 export type WebSource = {
   title: string
   url: string

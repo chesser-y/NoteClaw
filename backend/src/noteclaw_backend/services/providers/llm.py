@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+from collections.abc import AsyncIterator
 from typing import Protocol
 
 from openai import AsyncOpenAI
@@ -15,6 +17,15 @@ class LLMProvider(Protocol):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
+        ...
+
+    def stream_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str]:
         ...
 
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
@@ -44,6 +55,29 @@ class OpenAICompatibleLLMProvider:
             **kwargs,
         )
         return response.choices[0].message.content or ""
+
+    async def stream_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str]:
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.2 if temperature is None else temperature,
+            "stream": True,
+        }
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        stream = await self.client.chat.completions.create(**kwargs)
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            content = getattr(chunk.choices[0].delta, "content", None)
+            if content:
+                yield str(content)
 
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
         _ = schema
@@ -86,6 +120,21 @@ class FallbackLLMProvider:
             )[:1600]
         return "I could not find enough relevant knowledge in the current library to answer confidently."
 
+    async def stream_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str]:
+        text = await self.complete_text(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        async for chunk in _text_chunks(text):
+            yield chunk
+
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
         _ = schema
         text = "\n".join(str(msg.get("content", "")) for msg in messages)
@@ -124,6 +173,34 @@ class ResilientLLMProvider:
             temperature=temperature,
             max_tokens=max_tokens,
         )
+
+    async def stream_text(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str]:
+        if self.primary is not None:
+            emitted = False
+            try:
+                async for chunk in self.primary.stream_text(
+                    messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                ):
+                    emitted = True
+                    yield chunk
+                return
+            except Exception:
+                if emitted:
+                    raise
+        async for chunk in self.fallback.stream_text(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ):
+            yield chunk
 
     async def complete_json(self, messages: list[dict], schema: dict | None = None) -> dict:
         if self.primary is not None:
@@ -201,3 +278,9 @@ def _category(text: str) -> str:
         if any(needle in lowered for needle in needles):
             return category
     return "general"
+
+
+async def _text_chunks(text: str, *, size: int = 80) -> AsyncIterator[str]:
+    for index in range(0, len(text), size):
+        yield text[index : index + size]
+        await asyncio.sleep(0)

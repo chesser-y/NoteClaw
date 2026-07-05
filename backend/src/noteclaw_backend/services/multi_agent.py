@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from noteclaw_backend.domain.enums import (
@@ -28,6 +29,9 @@ from noteclaw_backend.settings import get_settings
 from noteclaw_backend.schemas.common import new_id
 
 
+AgentProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
+
+
 class MultiAgentWorkflowService:
     """Evidence-grounded multi-agent workflow orchestrator for deep knowledge tasks."""
 
@@ -43,7 +47,11 @@ class MultiAgentWorkflowService:
         workflows = [self._workflows[workflow_id] for workflow_id in ids]
         return workflows[offset : offset + limit], len(workflows)
 
-    async def run(self, request: AgentWorkflowRequest) -> AgentWorkflowResponse:
+    async def run(
+        self,
+        request: AgentWorkflowRequest,
+        on_progress: AgentProgressCallback | None = None,
+    ) -> AgentWorkflowResponse:
         workflow_id = new_id("workflow")
         task_id: str | None = None
         work_item_id: str | None = None
@@ -70,6 +78,14 @@ class MultiAgentWorkflowService:
             task_service.mark_running(task.id, "Coordinator planning agents")
 
         try:
+            await self._emit_progress(
+                on_progress,
+                stage="coordinator",
+                message="Coordinator planning agents",
+                progress=0.08,
+                workflow_id=workflow_id,
+                task_id=task_id,
+            )
             plan = await self._coordinator_plan(request)
             steps.append(
                 AgentStep(
@@ -82,8 +98,26 @@ class MultiAgentWorkflowService:
                     artifacts={"plan": plan},
                 )
             )
+            await self._emit_progress(
+                on_progress,
+                stage="coordinator",
+                message="Coordinator produced a workflow plan",
+                progress=0.25,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+            )
             self._update_task(task_id, 0.25, "Researcher collecting and structuring evidence")
 
+            await self._emit_progress(
+                on_progress,
+                stage="researcher",
+                message="Researcher collecting local and web evidence",
+                progress=0.34,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+            )
             research = await self._research(request, plan)
             claims = await self._evidence_claims(request.goal, research)
             steps.append(
@@ -110,8 +144,29 @@ class MultiAgentWorkflowService:
                         metadata={"web_source_count": len(research.web_sources)},
                     ),
                 )
+            await self._emit_progress(
+                on_progress,
+                stage="researcher",
+                message="Researcher structured evidence and citation-backed claims",
+                progress=0.58,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+                local_citation_count=len(research.citations),
+                web_source_count=len(research.web_sources),
+                evidence_anchor_count=len(research.evidence_anchors),
+            )
             self._update_task(task_id, 0.58, "Reasoner synthesizing final output")
 
+            await self._emit_progress(
+                on_progress,
+                stage="reasoner",
+                message="Reasoner synthesizing final answer",
+                progress=0.68,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+            )
             synthesis = await self._reason(request.goal, plan, claims, research)
             final_answer = await self._write(request, synthesis, claims, research)
             steps.append(
@@ -125,8 +180,26 @@ class MultiAgentWorkflowService:
                     artifacts={"output_format": request.output_format, "synthesis": synthesis[:1200]},
                 )
             )
+            await self._emit_progress(
+                on_progress,
+                stage="reasoner",
+                message="Reasoner produced a draft answer",
+                progress=0.86,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+            )
             self._update_task(task_id, 0.86, "Reviewer checking citations and risks")
 
+            await self._emit_progress(
+                on_progress,
+                stage="reviewer",
+                message="Reviewer checking citations and risks",
+                progress=0.92,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+            )
             review = await self._review(request.goal, final_answer, claims, research)
             steps.append(
                 AgentStep(
@@ -137,6 +210,16 @@ class MultiAgentWorkflowService:
                     output_summary=f"{review.verdict} · confidence={review.confidence:.2f}",
                     artifacts=review.model_dump(mode="json"),
                 )
+            )
+            await self._emit_progress(
+                on_progress,
+                stage="reviewer",
+                message="Reviewer finished quality check",
+                progress=0.98,
+                workflow_id=workflow_id,
+                task_id=task_id,
+                plan=plan,
+                review=review.model_dump(mode="json"),
             )
 
             if request.create_timeline_item:
@@ -448,6 +531,14 @@ class MultiAgentWorkflowService:
                 progress=progress,
                 message=message,
             )
+
+    async def _emit_progress(
+        self,
+        callback: AgentProgressCallback | None,
+        **payload: Any,
+    ) -> None:
+        if callback is not None:
+            await callback(payload)
 
     def _clean_steps(self, raw_steps: list[str], limit: int) -> list[str]:
         seen: set[str] = set()
