@@ -37,7 +37,7 @@ export const useChatStore = defineStore('chat', () => {
         sessionId.value = session.id
       }
       const currentMode = mode.value
-      const useWeb = currentMode === 'web' || currentMode === 'agent'
+      const useWeb = currentMode === 'web'
       const res = await sendChatMessage(sessionId.value!, {
         message: question,
         retrieval_mode: 'hybrid',
